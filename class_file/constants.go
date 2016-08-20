@@ -1,4 +1,4 @@
-package jvm
+package class_file
 
 // This file contains definitions used when parsing a class file's constant
 // pool.
@@ -59,7 +59,7 @@ func (t ConstantTag) CountsDouble() bool {
 // The high-level qualities available for all constants. Specific information
 // can be obtained by using type assertions to convert this to a pointer to one
 // of the Constant<..> structs.
-type ClassFileConstant interface {
+type Constant interface {
 	Tag() ConstantTag
 	String() string
 }
@@ -229,7 +229,7 @@ func (n *ConstantUTF8Info) String() string {
 // Holds the kind of method handle reference in a method handle constant.
 type MethodHandleReferenceKind uint8
 
-func (k MethodHandlReferenceKind) String() string {
+func (k MethodHandleReferenceKind) String() string {
 	switch k {
 	case 1:
 		return "get field"
@@ -305,9 +305,9 @@ func (n *ConstantInvokeDynamicInfo) String() string {
 }
 
 // Parses and returns a single class file constant in the table.
-func parseSingleClassConstant(data io.Reader) (ClassFileConstant, error) {
+func parseSingleConstant(data io.Reader) (Constant, error) {
 	var tag ConstantTag
-	var toReturn ClassFileConstant
+	var toReturn Constant
 	e := binary.Read(data, binary.BigEndian, &tag)
 	if e != nil {
 		return nil, fmt.Errorf("Failed reading constant tag: %s", e)
@@ -427,35 +427,28 @@ func parseSingleClassConstant(data io.Reader) (ClassFileConstant, error) {
 	return toReturn, nil
 }
 
-// Assumes the data reader is at the start of the ConstantPoolInfo table in the
-// class file. Fills in the ConstantPoolInfo struct in the ClassFile struct.
-func parseClassConstantsTable(data io.Reader, class *ClassFile,
-	count uint16) error {
+// Assumes the data reader is at the start of the Constant table. Returns a
+// slice of constants in the table. If any constants take up two entries in a
+// constant table (according to the JVM spec), the second of the two entries
+// will be nil in the returned slice.
+func parseConstantsTable(data io.Reader, count uint16) ([]Constant, error) {
 	var e error
-	var constant ClassFileConstant
-	// Note that since long and double constants are counted twice, this
-	// may actually be longer than needed...
-	constants := make([]ClassFileConstant, 0, count)
-	remaining := int(count)
-	for remaining > 0 {
-		constant, e = parseSingleClassConstant(data)
+	var constant Constant
+	constants := make([]Constant, count)
+	// The constant table is indexed starting from 1. We'll just waste a space
+	// here rather than having to check.
+	constants[0] = nil
+	for i := 1; i < int(count); i++ {
+		constant, e = parseSingleConstant(data)
 		if e != nil {
-			return e
+			return nil, e
 		}
-		remaining--
+		constants[i] = constant
+		// This will cause an entry in the constant table to remain nil, as
+		// desired.
 		if constant.Tag().CountsDouble() {
-			remaining--
+			i++
 		}
-		constants = append(constants, constant)
 	}
-	// This should only be possible if we encounter a long or double constant
-	// which wasn't accounted for properly in the count.
-	if remaining < 0 {
-		return fmt.Errorf("Invalid class file constant count: %d", count)
-	}
-	// Allocate a new slice that contains the actual number of constants rather
-	// than the amount contained in "count".
-	class.Constants = make([]ClassFileConstant, len(constants))
-	copy(class.Constants, constants)
-	return nil
+	return constants, nil
 }

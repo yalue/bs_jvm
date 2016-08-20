@@ -15,6 +15,7 @@ type jvmOpcodeInfo struct {
 	parse  parserFunction
 }
 
+// TODO: This is an array, not a map! Fix it!
 var opcodeTable = map[uint8]*jvmOpcodeInfo{
 	&jvmOpcodeInfo{
 		name:   "nop",
