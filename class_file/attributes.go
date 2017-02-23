@@ -154,7 +154,7 @@ func ParseInnerClassesAttribute(a *Attribute) ([]InnerClass, error) {
 // EnclosingMethod attribute.
 func ParseEnclosingMethodAttribute(a *Attribute) (uint16, uint16, error) {
 	if string(a.Name) != "EnclosingMethod" {
-		return nil, fmt.Errorf("Expected an EnclosingMethod attribute")
+		return 0, 0, fmt.Errorf("Expected an EnclosingMethod attribute")
 	}
 	data := bytes.NewReader(a.Info)
 	var classIndex, methodIndex uint16
@@ -184,7 +184,7 @@ func ParseSignatureAttribute(a *Attribute) (uint16, error) {
 }
 
 // Returns the source file index contained in a source file attribute.
-func ParseSignatureAttribute(a *Attribute) (uint16, error) {
+func ParseSourceFileAttribute(a *Attribute) (uint16, error) {
 	if string(a.Name) != "SourceFile" {
 		return 0, fmt.Errorf("Expected a source file attribute")
 	}
@@ -263,7 +263,7 @@ type LocalVariableTypeEntry struct {
 
 // Parses a local variable type table attribute, returning a slice of entries.
 func ParseLocalVariableTypeTableAttribute(a *Attribute) (
-	[]LocalVariableTypeEntry, e) {
+	[]LocalVariableTypeEntry, error) {
 	if string(a.Name) != "LocalVariableTypeTable" {
 		return nil, fmt.Errorf("Expected a local variable type table")
 	}
@@ -279,6 +279,75 @@ func ParseLocalVariableTypeTableAttribute(a *Attribute) (
 	if e != nil {
 		return nil, fmt.Errorf("Failed reading local variable type table: %s",
 			e)
+	}
+	return toReturn, nil
+}
+
+// Holds a single entry from a bootstrap methods attribute.
+type BootstrapMethod struct {
+	// The index of a method handle info entry in the constant table.
+	Reference uint16
+	// Indices into the constant table of the bootstrap's methods.
+	Arguments []uint16
+}
+
+// Parses and returns a bootstrap methods attribute, returning a slice of the
+// methods.
+func ParseBootstrapMethodsAttribute(a *Attribute) ([]BootstrapMethod, error) {
+	if string(a.Name) != "BootstrapMethods" {
+		return nil, fmt.Errorf("Expected a bootstrap methods attribute")
+	}
+	var count uint16
+	data := bytes.NewReader(a.Info)
+	e := binary.Read(data, binary.BigEndian, &count)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't read number of bootstrap methods: %s",
+			e)
+	}
+	toReturn := make([]BootstrapMethod, count)
+	var argumentCount, methodRef uint16
+	for i := range toReturn {
+		e = binary.Read(data, binary.BigEndian, &methodRef)
+		if e != nil {
+			return nil, fmt.Errorf("Couldn't read bootstrap method ref: %s", e)
+		}
+		e = binary.Read(data, binary.BigEndian, &argumentCount)
+		if e != nil {
+			return nil, fmt.Errorf("Couldn't read number of arguments: %s", e)
+		}
+		args := make([]uint16, argumentCount)
+		e = binary.Read(data, binary.BigEndian, args)
+		if e != nil {
+			return nil, fmt.Errorf("Couldn't read bootstrap args: %s", e)
+		}
+		toReturn[i].Reference = methodRef
+		toReturn[i].Arguments = args
+	}
+	return toReturn, nil
+}
+
+// A single entry in a MethodParameters attribute.
+type MethodParameter struct {
+	NameIndex   uint16
+	AccessFlags uint16
+}
+
+// Parses a MethodParameters attribute and returns a slice of MethodParameter
+// structs.
+func ParseMethodParametersAttribute(a *Attribute) ([]MethodParameter, error) {
+	if string(a.Name) != "MethodParameters" {
+		return nil, fmt.Errorf("Expected a method parameters attribute")
+	}
+	data := bytes.NewReader(a.Info)
+	var count uint8
+	e := binary.Read(data, binary.BigEndian, &data)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't read method parameter count: %s", e)
+	}
+	toReturn := make([]MethodParameter, count)
+	e = binary.Read(data, binary.BigEndian, toReturn)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't read method parameters: %s", e)
 	}
 	return toReturn, nil
 }
@@ -326,10 +395,3 @@ func (c *ClassFile) parseAttributesTable(data io.Reader,
 	}
 	return attributes, nil
 }
-
-// TODO: Add parsing for all remaining attribute types:
-// - RuntimeVisibleTypeAnnotations
-// - RuntimeInvisibleTypeAnnotations
-// - AnnotationDefault
-// - BootstrapMethods
-// - MethodParameters

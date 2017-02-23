@@ -19,6 +19,19 @@ type JVMMemory interface {
 	SetByte(value uint8, address uint) error
 }
 
+// Reads and returns a big-endian 16-bit integer at the given address.
+func Read16Bits(m JVMMemory, address uint) (uint16, error) {
+	high, e := m.GetByte(address)
+	if e != nil {
+		return 0, e
+	}
+	low, e := m.GetByte(address + 1)
+	if e != nil {
+		return 0, e
+	}
+	return (uint16(high) << 8) | uint16(low)
+}
+
 type basicJVMMemory struct {
 	memory []byte
 }

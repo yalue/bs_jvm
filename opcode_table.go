@@ -15,8 +15,15 @@ type jvmOpcodeInfo struct {
 	parse  parserFunction
 }
 
-// TODO: This is an array, not a map! Fix it!
-var opcodeTable = map[uint8]*jvmOpcodeInfo{
+// Holds each opcode, indexed by the opcode's 8-bit value. Will hold a nil if
+// the opcode is invalid. Intialized by the init() function, using the values
+// held in the opcodeMap.
+var opcodeTable []*jvmOpcodeInfo
+
+// This is only used to initialize the opcodeTable slice, but isn't used for
+// actual lookups. This will be nil after initialization so its memory can be
+// freed! Use opcodeTable instead!
+var opcodeMap = map[uint8]*jvmOpcodeInfo{
 	&jvmOpcodeInfo{
 		name:   "nop",
 		opcode: 0x00,
@@ -1042,4 +1049,11 @@ var opcodeTable = map[uint8]*jvmOpcodeInfo{
 		opcode: 0xff,
 		parse:  parseImpdep2Instruction,
 	},
+}
+
+func init() {
+	for _, v := range opcodeMap {
+		opcodeTable[v.opcode] = v
+	}
+	opcodeMap = nil
 }

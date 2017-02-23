@@ -119,3 +119,5 @@ func TestParseStackMapFrameAttributes(t *testing.T) {
 		t.Logf("  %s\n", f)
 	}
 }
+
+// TODO: Add a test for annotations.
