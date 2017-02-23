@@ -29,7 +29,20 @@ func Read16Bits(m JVMMemory, address uint) (uint16, error) {
 	if e != nil {
 		return 0, e
 	}
-	return (uint16(high) << 8) | uint16(low)
+	return (uint16(high) << 8) | uint16(low), nil
+}
+
+// Reads and returns a big-endian 32-bit integer at the given address.
+func Read32Bits(m JVMMemory, address uint) (uint32, error) {
+	high, e := Read16Bits(address)
+	if e != nil {
+		return 0, e
+	}
+	low, e := Read16Bits(address + 2)
+	if e != nil {
+		return 0, e
+	}
+	return (uint32(high) << 16) | uint32(low), nil
 }
 
 type basicJVMMemory struct {

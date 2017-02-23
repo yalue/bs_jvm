@@ -2302,29 +2302,252 @@ func parseIf_acmpneInstruction(opcode uint8, name string, address uint,
 	return (*if_acmpneInstruction)(toReturn), nil
 }
 
+type gotoInstruction twoByteArgumentInstruction
+
 func parseGotoInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*gotoInstruction)(toReturn), nil
 }
+
+type jsrInstruction twoByteArgumentInstruction
 
 func parseJsrInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*jsrInstruction)(toReturn), nil
 }
+
+type retInstruction singleByteArgumentInstruction
 
 func parseRetInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*retInstruction)(toReturn), nil
+}
+
+// Probably the hairiest opcode in Java; this contains a list of potential
+// jump targets.
+type tableswitchInstruction struct {
+	// This may be nil, if the start of the high offset was already 4-byte
+	// aligned. It will contain at most 3 bytes.
+	skippedBytes  []byte
+	defaultOffset uint32
+	lowOffset     uint32
+	highOffset    uint32
+	offsets       []uint32
+}
+
+func (n *tableswitchInstruction) Raw() uint8 {
+	return 0xaa
+}
+
+func (n *tableswitchInstruction) Length() uint {
+	// 12 bytes for high, low and default offsets, plus one byte for the
+	// opcode, 4 per offset in the list, and up to 3 skipped padding bytes.
+	// This is called by OtherBytes() to allocate a buffer, so it must not
+	// depend on OtherBytes().
+	return uint(len(n.skippedBytes)) + uint(len(n.offsets)*4) + 13
+}
+
+func (n *tableswitchInstruction) OtherBytes() []byte {
+	toReturn := make([]byte, n.Length()-1)
+	offset := 0
+	// Use this inner function for convenience, and allowing us to avoid
+	// encoding/binary.
+	// TODO: Test this!!
+	writeValueToBuffer := func(value uint32) {
+		toReturn[offset] = uint8(value >> 24)
+		toReturn[offset+1] = uint8(value >> 16)
+		toReturn[offset+2] = uint8(value >> 8)
+		toReturn[offset+3] = uint8(value)
+		offset += 4
+	}
+	if n.skippedBytes != nil {
+		copy(toReturn, n.skippedBytes)
+		offset += len(n.skippedBytes)
+	}
+	writeValueToBuffer(n.highOffset)
+	writeValueToBuffer(n.lowOffset)
+	writeValueToBuffer(n.defaultOffset)
+	for _, v := range n.offsets {
+		writeValueToBuffer(v)
+	}
+	return toReturn
+}
+
+func (n *tableswitchInstruction) String() string {
+	return fmt.Sprintf("tableswitch 0x%08x-0x%08x (default 0x%08x)",
+		n.lowOffset, n.highOffset, n.defaultOffset)
 }
 
 func parseTableswitchInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	var e error
+	var toReturn tableswitchInstruction
+	currentOffset := address + 1
+	// First, read up to 3 bytes to get to a 4-byte aligned address
+	paddingBytes := address % 4
+	if paddingBytes > 0 {
+		toReturn.skippedBytes = make([]byte, paddingBytes)
+		for i := range toReturn.skippedBytes {
+			toReturn.skippedBytes[i], e = m.GetByte(currentOffset)
+			if e != nil {
+				return nil, fmt.Errorf("Couldn't align tableswitch: %s", e)
+			}
+			currentOffset++
+		}
+	}
+	toReturn.defaultOffset, e = Read32Bits(m, currentOffset)
+	if e != nil {
+		return nil, fmt.Errorf("Failed reading tableswitch default: %s", e)
+	}
+	currentOffset += 4
+	toReturn.lowOffset, e = Read32Bits(m, currentOffset)
+	if e != nil {
+		return nil, fmt.Errorf("Failed reading tableswitch low offset: %s", e)
+	}
+	currentOffset += 4
+	toReturn.highOffset, e = Read32Bits(m, currentOffset)
+	if e != nil {
+		return nil, fmt.Errorf("Failed reading tableswitch high offset: %s", e)
+	}
+	currentOffset += 4
+	if toReturn.highOffset < toReturn.lowOffset {
+		return nil, fmt.Errorf("Tableswitch offset range invalid")
+	}
+	offsetsCount := toReturn.highOffset - toReturn.lowOffset + 1
+	toReturn.offsets = make([]uint32, offsetsCount)
+	for i := range toReturn.offsets {
+		toReturn.offsets[i], e = Read32Bit(m, currentOffset)
+		if e != nil {
+			return nil, fmt.Errorf("Failed reading tableswitch offset: %s", e)
+		}
+		currentOffset += 4
+	}
+	return &toReturn, nil
+}
+
+// A single entry in the lookupswitch instruction's table.
+type lookupswitchPair struct {
+	match  int32
+	offset uint32
+}
+
+// A very similar structure to the tableswitch instruction.
+type lookupswitchInstruction struct {
+	// For 4-byte alignment, like tableswitch
+	skippedBytes  []byte
+	defaultOffset uint32
+	pairs         []lookupswitchPair
+}
+
+func (n *lookupswitchInstruction) Raw() uint8 {
+	return 0xab
+}
+
+func (n *lookupswitchInstruction) Length() uint {
+	return uint(len(n.skippedBytes)) + uint(len(n.pairs)*8) + 9
+}
+
+func (n *lookupswitchInstruction) OtherBytes() []byte {
+	toReturn := make([]byte, n.Length())
+	var e error
+	offset := 0
+	appendValue := func(v uint32) {
+		toReturn[offset] = uint8(v >> 24)
+		toReturn[offset+1] = uint8(v >> 16)
+		toReturn[offset+2] = uint8(v >> 8)
+		toReturn[offset+3] = uint8(v)
+		offset += 4
+	}
+	if n.skippedBytes != nil {
+		copy(toReturn, n.skippedBytes)
+		offset += len(n.skippedBytes)
+	}
+	appendValue(n.defaultOffset)
+	appendValue(uint32(len(n.pairs)))
+	for i := range n.pairs {
+		appendValue(n.pairs[i].match)
+		appendValue(n.pairs[i].offset)
+	}
+	return toReturn
+}
+
+func (n *lookupswitchInstruction) String() string {
+	return fmt.Sprintf("lookupswitch [%d possible] (default offset 0x%08x)",
+		len(n.pairs), n.defaultOffset)
 }
 
 func parseLookupswitchInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	var e error
+	var toReturn lookupSwitchInstruction
+	currentOffset := address + 1
+	// Skip padding as in tableswitch
+	paddingBytes := address % 4
+	if paddingBytes > 0 {
+		toReturn.skippedBytes = make([]byte, paddingBytes)
+		for i := range toReturn.skippedBytes {
+			toReturn.skippedBytes[i], e = m.GetByte(currentOffset)
+			if e != nil {
+				return nil, fmt.Errorf("Couldn't align lookupswitch: %s", e)
+			}
+			currentOffset++
+		}
+	}
+	toReturn.defaultOffset, e = Read32Bits(m, currentOffset)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't read lookupswitch default: %s", e)
+	}
+	currentOffset += 4
+	pairsCount, e := Read32Bits(m, currentOffset)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't read lookupswitch size: %s", e)
+	}
+	currentOffset += 4
+	toReturn.pairs = make([]lookupswitchPair, pairsCount)
+	// 0 pairs is technically legal.
+	if pairsCount == 0 {
+		return &toReturn, nil
+	}
+	var tmp uint32
+	for i := range toReturn.pairs {
+		tmp, e = Read32Bits(m, currentOffset)
+		if e != nil {
+			return nil, fmt.Errorf("Couldn't read lookupswitch match: %s", e)
+		}
+		toReturn.pairs[i].match = int32(tmp)
+		currentOffset += 4
+		toReturn.pairs[i].offset, e = Read32Bits(m, currentOffset)
+		if e != nil {
+			return nil, fmt.Errorf("Couldn't read lookupswitch offset: %s", e)
+		}
+		currentOffset += 4
+	}
+	// Finally, verify that the values are in sorted order.
+	prevMatch := toReturn.pairs[0].match
+	var thisMatch int32
+	for i := range toReturn.pairs {
+		if i == 0 {
+			continue
+		}
+		thisMatch = toReturn.pairs[i]
+		if prevMatch >= thisMatch {
+			return nil, fmt.Errorf("lookupswitch table not sorted")
+		}
+		prevMatch = thisMatch
+	}
+	return &toReturn, nil
 }
 
 type ireturnInstruction knownJVMInstruction
@@ -2405,24 +2628,48 @@ func parseReturnInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
+type getstaticInstruction twoByteArgumentInstruction
+
 func parseGetstaticInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*getstaticInstruction)(toReturn), nil
 }
+
+type putstaticInstruction twoByteArgumentInstruction
 
 func parsePutstaticInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*putstaticInstruction)(toReturn), nil
 }
+
+type getfieldInstruction twoByteArgumentInstruction
 
 func parseGetfieldInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*getfieldInstruction)(toReturn), nil
 }
+
+type putfieldInstruction twoByteArgumentInstruction
 
 func parsePutfieldInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*putfieldInstruction)(toReturn), nil
 }
 
 func parseInvokevirtualInstruction(opcode uint8, name string, address uint,
