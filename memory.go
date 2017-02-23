@@ -56,7 +56,7 @@ func (m *basicJVMMemory) GetByte(address uint) (uint8, error) {
 	return m.memory[address], nil
 }
 
-func (m *basicJVMMemroy) SetByte(value uint8, address uint) error {
+func (m *basicJVMMemory) SetByte(value uint8, address uint) error {
 	if address > uint(len(m.memory)) {
 		return 0, InvalidAddressError(address)
 	}

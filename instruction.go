@@ -2672,44 +2672,127 @@ func parsePutfieldInstruction(opcode uint8, name string, address uint,
 	return (*putfieldInstruction)(toReturn), nil
 }
 
+type invokevirtualInstruction twoByteArgumentInstruction
+
 func parseInvokevirtualInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*invokevirtualInstruction)(toReturn), nil
 }
+
+type invokespecialInstruction twoByteArgumentInstruction
 
 func parseInvokespecialInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*invokespecialInstruction)(toReturn), nil
 }
+
+type invokestaticInstruction twoByteArgumentInstruction
 
 func parseInvokestaticInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*invokestaticInstruction)(toReturn), nil
+}
+
+type invokeinterfaceInstruction struct {
+	twoByteArgumentInstruction
+	count uint8
+}
+
+// The invokeinterface instruction contains a single 0-byte at the end.
+func (n *invokeinterfaceInstruction) OtherBytes() []byte {
+	toReturn := make([]byte, 5)
+	copy(toReturn, (&(n.twoByteArgumentInstruction)).OtherBytes())
+	toReturn[3] = n.count
+	return toReturn
+}
+
+func (n *invokeinterfaceInstruction) Length() uint {
+	return 5
 }
 
 func parseInvokeinterfaceInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	tmp, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	count, e := m.GetByte(address + 3)
+	if e != nil {
+		return nil, fmt.Errorf("Failed getting invokeinterface count: %s", e)
+	}
+	toReturn := invokeinterfaceInstruction{
+		twoByteArgumentInstruction: *tmp,
+		count: count,
+	}
+	return &toReturn, nil
+}
+
+type invokedynamicInstruction twoByteArgumentInstruction
+
+// The invokedynamic instruction contains two 0-bytes following the 16-bit
+// index.
+func (n *invokedynamicInstruction) OtherBytes() []byte {
+	toReturn := make([]byte, 5)
+	copy(toReturn, (*twoByteArgumentInstruction)(n).OtherBytes())
+	return toReturn
+}
+
+func (n *invokedynamicInstruction) Length() uint {
+	return 5
 }
 
 func parseInvokedynamicInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*invokedynamicInstruction)(toReturn), nil
 }
+
+type newInstruction twoByteArgumentInstruction
 
 func parseNewInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*newInstruction)(toReturn), nil
 }
+
+type newarrayInstruction singleByteArgumentInstruction
 
 func parseNewarrayInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*newarrayInstruction)(toReturn), nil
 }
+
+type anewarrayInstruction twoByteArgumentInstruction
 
 func parseAnewarrayInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*anewarrayInstruction)(toReturn), nil
 }
 
 type arraylengthInstruction knownJVMInstruction
@@ -2738,14 +2821,26 @@ func parseAthrowInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
+type checkcastInstruction twoByteArgumentInstruction
+
 func parseCheckcastInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*checkcastInstruction)(toReturn), nil
 }
+
+type instanceofInstruction twoByteArgumentInstruction
 
 func parseInstanceofInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*instanceofInstruction)(toReturn), nil
 }
 
 type monitorenterInstruction knownJVMInstruction
