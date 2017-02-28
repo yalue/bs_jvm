@@ -34,11 +34,11 @@ func Read16Bits(m JVMMemory, address uint) (uint16, error) {
 
 // Reads and returns a big-endian 32-bit integer at the given address.
 func Read32Bits(m JVMMemory, address uint) (uint32, error) {
-	high, e := Read16Bits(address)
+	high, e := Read16Bits(m, address)
 	if e != nil {
 		return 0, e
 	}
-	low, e := Read16Bits(address + 2)
+	low, e := Read16Bits(m, address + 2)
 	if e != nil {
 		return 0, e
 	}
@@ -58,7 +58,7 @@ func (m *basicJVMMemory) GetByte(address uint) (uint8, error) {
 
 func (m *basicJVMMemory) SetByte(value uint8, address uint) error {
 	if address > uint(len(m.memory)) {
-		return 0, InvalidAddressError(address)
+		return InvalidAddressError(address)
 	}
 	m.memory[address] = value
 	return nil

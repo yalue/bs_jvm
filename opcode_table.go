@@ -23,7 +23,7 @@ var opcodeTable []*jvmOpcodeInfo
 // This is only used to initialize the opcodeTable slice, but isn't used for
 // actual lookups. This will be nil after initialization so its memory can be
 // freed! Use opcodeTable instead!
-var opcodeMap = map[uint8]*jvmOpcodeInfo{
+var tempOpcodeMap = []*jvmOpcodeInfo{
 	&jvmOpcodeInfo{
 		name:   "nop",
 		opcode: 0x00,
@@ -1052,8 +1052,9 @@ var opcodeMap = map[uint8]*jvmOpcodeInfo{
 }
 
 func init() {
-	for _, v := range opcodeMap {
+	opcodeTable = make([]*jvmOpcodeInfo, 0xff)
+	for _, v := range tempOpcodeMap {
 		opcodeTable[v.opcode] = v
 	}
-	opcodeMap = nil
+	tempOpcodeMap = nil
 }
