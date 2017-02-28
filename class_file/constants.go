@@ -64,6 +64,17 @@ type Constant interface {
 	String() string
 }
 
+// An empty constant that should never actually be referenced.
+type emptyConstant struct{}
+
+func (c *emptyConstant) Tag() ConstantTag {
+	return 0
+}
+
+func (c *emptyConstant) String() string {
+	return "Invalid/empty constant. This shouldn't be referenced."
+}
+
 // Represents a class or interface
 type ConstantClassInfo struct {
 	// The index of a UTF-8 constant containing the class name
@@ -437,7 +448,7 @@ func parseConstantsTable(data io.Reader, count uint16) ([]Constant, error) {
 	constants := make([]Constant, count)
 	// The constant table is indexed starting from 1. We'll just waste a space
 	// here rather than having to check.
-	constants[0] = nil
+	constants[0] = &emptyConstant{}
 	for i := 1; i < int(count); i++ {
 		constant, e = parseSingleConstant(data)
 		if e != nil {
