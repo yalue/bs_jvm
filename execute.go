@@ -790,6 +790,10 @@ func (n *wideInstruction) Execute(t JVMThread) error {
 	return NotImplementedError
 }
 
+func (n *wideIincInstruction) Execute(t JVMThread) error {
+	return NotImplementedError
+}
+
 func (n *multianewarrayInstruction) Execute(t JVMThread) error {
 	return NotImplementedError
 }

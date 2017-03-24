@@ -2871,11 +2871,115 @@ func parseMonitorexitInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-func parseWideInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+// Holds the opcode and argument affected by the wide instruction opcode.
+type wideInstruction struct {
+	// This opcode *must* be one of iload, fload, aload, lload, dload, istore,
+	// fstore, astore, lstore, dstore, or ret. This will be checked by
+	// parseWideInstruction
+	opcode   uint8
+	argument uint16
 }
 
+func (n *wideInstruction) Raw() uint8 {
+	return 0xc4
+}
+
+func (n *wideInstruction) OtherBytes() []byte {
+	return []byte{n.opcode, uint8(n.argument >> 8), uint8(n.argument & 0xff)}
+}
+
+func (n *wideInstruction) Length() uint {
+	return 4
+}
+
+func (n *wideInstruction) String() string {
+	return fmt.Sprintf("wide %s 0x%04x", opcodeTable[n.opcode].name,
+		n.argument)
+}
+
+// The wide iinc instruction has an additional two-byte argument in addition to
+// the wide opcode.
+type wideIincInstruction struct {
+	index uint16
+	value uint16
+}
+
+func (n *wideIincInstruction) Raw() uint8 {
+	return 0xc4
+}
+
+func (n *wideIincInstruction) OtherBytes() []byte {
+	// The iinc instruction has opcode 0x84
+	return []byte{
+		0x84,
+		uint8(n.index >> 8),
+		uint8(n.index & 0xff),
+		uint8(n.value >> 8),
+		uint8(n.value & 0xff),
+	}
+}
+
+func (n *wideIincInstruction) Length() uint {
+	return 6
+}
+
+func (n *wideIincInstruction) String() string {
+	return fmt.Sprintf("wide iinc 0x%04x 0x%04x", n.index, n.value)
+}
+
+// This only parses "wide iinc ..." instructions, and will be called by
+// parseWideInstruction
+func parseWideIincInstruction(address uint, m JVMMemory) (
+	JVMInstruction, error) {
+	index, e := Read16Bits(m, address+2)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't read index for wide iinc: %s", e)
+	}
+	value, e := Read16Bits(m, address+4)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't read value for wide iinc: %s", e)
+	}
+	toReturn := wideIincInstruction{
+		index: index,
+		value: value,
+	}
+	return &toReturn, nil
+}
+
+func parseWideInstruction(opcode uint8, name string, address uint,
+	m JVMMemory) (JVMInstruction, error) {
+	opcode, e := m.GetByte(address + 1)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't get wide instruction opcode: %s", e)
+	}
+	// Check that the opcode is one of iload, fload, aload, lload, dload,
+	// istore, fstore, astore, lstore, dstore, or ret. iinc is also handled
+	// in a separate function returning a different struct.
+	switch {
+	case opcode == 0x84:
+		return parseWideIincInstruction(address, m)
+	case (opcode >= 0x15) && (opcode <= 0x19):
+		// The opcode is one of the load instructions.
+		break
+	case (opcode >= 0x36) && (opcode <= 0x3a):
+		// The opcode is one of the store instructions.
+	default:
+		return nil, fmt.Errorf("Invalid wide instruction opcode: 0x%02x",
+			opcode)
+	}
+	value, e := Read16Bits(m, address+2)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't read wide instruction argument: %s",
+			e)
+	}
+	toReturn := wideInstruction{
+		opcode:   opcode,
+		argument: value,
+	}
+	return &toReturn, nil
+}
+
+// TODO (next): Implement parseMultianewarrayInstruction
 func parseMultianewarrayInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
 	return nil, NotImplementedError
