@@ -1052,7 +1052,7 @@ var tempOpcodeMap = []*jvmOpcodeInfo{
 }
 
 func init() {
-	opcodeTable = make([]*jvmOpcodeInfo, 0xff)
+	opcodeTable = make([]*jvmOpcodeInfo, 0x100)
 	for _, v := range tempOpcodeMap {
 		opcodeTable[v.opcode] = v
 	}

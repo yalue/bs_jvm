@@ -2463,7 +2463,6 @@ func (n *lookupswitchInstruction) Length() uint {
 
 func (n *lookupswitchInstruction) OtherBytes() []byte {
 	toReturn := make([]byte, n.Length())
-	var e error
 	offset := 0
 	appendValue := func(v uint32) {
 		toReturn[offset] = uint8(v >> 24)
@@ -2885,7 +2884,7 @@ func (n *wideInstruction) Raw() uint8 {
 }
 
 func (n *wideInstruction) OtherBytes() []byte {
-	return []byte{n.opcode, uint8(n.argument >> 8), uint8(n.argument & 0xff)}
+	return []byte{n.opcode, uint8(n.argument >> 8), uint8(n.argument)}
 }
 
 func (n *wideInstruction) Length() uint {
@@ -2913,9 +2912,9 @@ func (n *wideIincInstruction) OtherBytes() []byte {
 	return []byte{
 		0x84,
 		uint8(n.index >> 8),
-		uint8(n.index & 0xff),
+		uint8(n.index),
 		uint8(n.value >> 8),
-		uint8(n.value & 0xff),
+		uint8(n.value),
 	}
 }
 
@@ -2979,30 +2978,124 @@ func parseWideInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-// TODO (next): Implement parseMultianewarrayInstruction
+type multianewarrayInstruction struct {
+	typeIndex  uint16
+	dimensions uint8
+}
+
+func (n *multianewarrayInstruction) Raw() uint8 {
+	return 0xc5
+}
+
+func (n *multianewarrayInstruction) OtherBytes() []byte {
+	return []byte{uint8(n.typeIndex >> 8), uint8(n.typeIndex),
+		n.dimensions}
+}
+
+func (n *multianewarrayInstruction) Length() uint {
+	return 4
+}
+
+func (n *multianewarrayInstruction) String() string {
+	return fmt.Sprintf("multianewarray 0x%04x %d", n.typeIndex, n.dimensions)
+}
+
 func parseMultianewarrayInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	typeIndex, e := Read16Bits(m, address+1)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't get multianewarray type index: %s", e)
+	}
+	dimensions, e := m.GetByte(address + 3)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't get multianewarray dimensions: %s", e)
+	}
+	toReturn := multianewarrayInstruction{
+		typeIndex:  typeIndex,
+		dimensions: dimensions,
+	}
+	return &toReturn, nil
 }
+
+type ifnullInstruction twoByteArgumentInstruction
 
 func parseIfnullInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*ifnullInstruction)(toReturn), nil
 }
+
+type ifnonnullInstruction twoByteArgumentInstruction
 
 func parseIfnonnullInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*ifnonnullInstruction)(toReturn), nil
 }
+
+// Can be any instruction which uses a single four-byte argument, such as jsr_w
+// or goto_w.
+type fourByteArgumentInstruction struct {
+	basicJVMInstruction
+	name  string
+	value uint32
+}
+
+func (n *fourByteArgumentInstruction) OtherBytes() []byte {
+	return []byte{uint8(n.value >> 24), uint8(n.value >> 16),
+		uint8(n.value >> 8), uint8(n.value)}
+}
+
+func (n *fourByteArgumentInstruction) Length() uint {
+	return 5
+}
+
+func (n *fourByteArgumentInstruction) String() string {
+	return fmt.Sprintf("%s 0x%08x", n.name, n.value)
+}
+
+func parseFourByteArgumentInstruction(opcode uint8, name string, address uint,
+	m JVMMemory) (*fourByteArgumentInstruction, error) {
+	value, e := Read32Bits(m, address+1)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't read argument for %s: %s", name, e)
+	}
+	toReturn := fourByteArgumentInstruction{
+		basicJVMInstruction: basicJVMInstruction{
+			raw: opcode,
+		},
+		name:  name,
+		value: value,
+	}
+	return &toReturn, nil
+}
+
+type goto_wInstruction fourByteArgumentInstruction
 
 func parseGoto_wInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseFourByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*goto_wInstruction)(toReturn), nil
 }
+
+type jsr_wInstruction fourByteArgumentInstruction
 
 func parseJsr_wInstruction(opcode uint8, name string, address uint,
 	m JVMMemory) (JVMInstruction, error) {
-	return nil, NotImplementedError
+	toReturn, e := parseFourByteArgumentInstruction(opcode, name, address, m)
+	if e != nil {
+		return nil, e
+	}
+	return (*jsr_wInstruction)(toReturn), nil
 }
 
 type breakpointInstruction knownJVMInstruction

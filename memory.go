@@ -38,7 +38,7 @@ func Read32Bits(m JVMMemory, address uint) (uint32, error) {
 	if e != nil {
 		return 0, e
 	}
-	low, e := Read16Bits(m, address + 2)
+	low, e := Read16Bits(m, address+2)
 	if e != nil {
 		return 0, e
 	}
