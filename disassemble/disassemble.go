@@ -48,6 +48,10 @@ func run() int {
 	flag.StringVar(&filename, "filename", "",
 		"The name of the class file to view.")
 	flag.Parse()
+	if filename == "" {
+		fmt.Println("Invalid arguments. Run with -help for more information.")
+		return 1
+	}
 	file, e := os.Open(filename)
 	if e != nil {
 		fmt.Printf("Error opening class file: %s\n", e)
@@ -60,23 +64,16 @@ func run() int {
 		return 1
 	}
 	fmt.Printf("Methods in %s:\n", filename)
-	var codeBytes []byte
+	var codeAttribute *class_file.CodeAttribute
 	// Display disassembly for each method.
 	for i, method := range class.Methods {
-		codeBytes = nil
-		fmt.Printf("%d: %s\n", i, method)
-		for _, attribute := range method.Attributes {
-			if string(attribute.Name) != "Code" {
-				continue
-			}
-			codeBytes = attribute.Info
-			break
-		}
-		if codeBytes == nil {
-			fmt.Printf("  Missing Code attribute.\n")
+		fmt.Printf("Method %d: %s\n", i, method)
+		codeAttribute, e = method.GetCodeAttribute(class)
+		if e != nil {
+			fmt.Printf("  Couldn't get code attribute: %s\n", e)
 			continue
 		}
-		e = printDisassembly(codeBytes)
+		e = printDisassembly(codeAttribute.Code)
 		if e != nil {
 			fmt.Printf("  Failed disassembling code: %s\n", e)
 			continue

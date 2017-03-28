@@ -68,8 +68,33 @@ type Method struct {
 }
 
 func (m *Method) String() string {
-	return fmt.Sprintf("%s method, name %s, descriptor %s, %d attributes",
+	return fmt.Sprintf("%s method, name %s, descriptor %s, %d attribute(s)",
 		m.Access, m.Name, m.Descriptor, len(m.Attributes))
+}
+
+// Returns this method's code attribute, which must exist by the JVM spec.
+// Returns an error if one occurs. This will scan the method's attributes table
+// and parse the Code attribute, so this shouldn't be called frequently to
+// preserve performance.
+func (m *Method) GetCodeAttribute(class *ClassFile) (*CodeAttribute, error) {
+	found := false
+	var e error
+	var codeAttribute *CodeAttribute
+	for _, attribute := range m.Attributes {
+		if string(attribute.Name) != "Code" {
+			continue
+		}
+		codeAttribute, e = ParseCodeAttribute(attribute, class)
+		if e != nil {
+			return nil, fmt.Errorf("Invalid code attribute: %s", e)
+		}
+		found = true
+		break
+	}
+	if !found {
+		return nil, fmt.Errorf("The method was missing a Code attribute")
+	}
+	return codeAttribute, nil
 }
 
 // Parses a single method structure.

@@ -52,7 +52,7 @@ class JVMOpcode
   end
 
   def to_go_type_definition
-    "type #{self.to_go_type} knownJVMInstruction\n"
+    "type #{self.to_go_type} struct{ knownJVMInstruction }\n"
   end
 
   def to_go_parser_function
@@ -62,10 +62,10 @@ class JVMOpcode
     signature = split_line(signature)
     to_return = signature + "\n"
     to_return += "\ttoReturn := #{self.to_go_type}{\n"
-    to_return += "\t\tbasicJVMInstruction{\n"
+    to_return += "\t\tknownJVMInstruction{\n"
     to_return += "\t\t\traw: 0x%02x,\n" % [@opcode]
+    to_return += "\t\t\tname: name,\n"
     to_return += "\t\t},\n"
-    to_return += "\t\tname: \"#{@name}\",\n"
     to_return += "\t}\n"
     to_return += "\treturn &toReturn, nil\n"
     to_return += "}\n"
