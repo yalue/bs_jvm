@@ -23,6 +23,12 @@ type JVMInstruction interface {
 	// nil if the instruction doesn't have such bytes. May be slow for some
 	// opcodes.
 	OtherBytes() []byte
+	// This takes a reference to the current pre-parsed method, and the
+	// instruction's offset (in bytes) into the method code. This may be called
+	// during an optimization pass before execution. It should be treated as
+	// optional, so Execute(..) should function regardless of whether this has
+	// been called.
+	Optimize(m *JVMMethod, offset uint) error
 	// Runs the instruction in the given thread
 	Execute(t JVMThread) error
 	// Returns the length of the instruction, including the opcode and
@@ -47,6 +53,10 @@ func (n *unknownJVMInstruction) OtherBytes() []byte {
 
 func (n *unknownJVMInstruction) Length() uint {
 	return 1
+}
+
+func (n *unknownJVMInstruction) Optimize(m *JVMMethod, offset uint) error {
+	return nil
 }
 
 func (n *unknownJVMInstruction) Execute(t JVMThread) error {
@@ -335,7 +345,7 @@ func parseSingleByteArgumentInstruction(opcode uint8, name string,
 			e)
 	}
 	toReturn := singleByteArgumentInstruction{
-		raw: opcode,
+		raw:   opcode,
 		name:  name,
 		value: value,
 	}
@@ -2367,7 +2377,7 @@ func parseRetInstruction(opcode uint8, name string, address uint,
 type tableswitchInstruction struct {
 	// This may be nil, if the start of the high offset was already 4-byte
 	// aligned. It will contain at most 3 bytes.
-	skippedBytes  []byte
+	skippedCount  uint8
 	defaultOffset uint32
 	lowOffset     uint32
 	highOffset    uint32
@@ -2383,7 +2393,7 @@ func (n *tableswitchInstruction) Length() uint {
 	// opcode, 4 per offset in the list, and up to 3 skipped padding bytes.
 	// This is called by OtherBytes() to allocate a buffer, so it must not
 	// depend on OtherBytes().
-	return uint(len(n.skippedBytes)) + uint(len(n.offsets)*4) + 13
+	return uint(n.skippedCount) + uint(len(n.offsets)*4) + 13
 }
 
 func (n *tableswitchInstruction) OtherBytes() []byte {
@@ -2399,9 +2409,9 @@ func (n *tableswitchInstruction) OtherBytes() []byte {
 		toReturn[offset+3] = uint8(value)
 		offset += 4
 	}
-	if n.skippedBytes != nil {
-		copy(toReturn, n.skippedBytes)
-		offset += len(n.skippedBytes)
+	for i := uint8(0); i < n.skippedCount; i++ {
+		toReturn[offset] = 0
+		offset++
 	}
 	writeValueToBuffer(n.highOffset)
 	writeValueToBuffer(n.lowOffset)
@@ -2423,17 +2433,8 @@ func parseTableswitchInstruction(opcode uint8, name string, address uint,
 	var toReturn tableswitchInstruction
 	currentOffset := address + 1
 	// First, read up to 3 bytes to get to a 4-byte aligned address
-	paddingBytes := address % 4
-	if paddingBytes > 0 {
-		toReturn.skippedBytes = make([]byte, paddingBytes)
-		for i := range toReturn.skippedBytes {
-			toReturn.skippedBytes[i], e = m.GetByte(currentOffset)
-			if e != nil {
-				return nil, fmt.Errorf("Couldn't align tableswitch: %s", e)
-			}
-			currentOffset++
-		}
-	}
+	toReturn.skippedCount = uint8(currentOffset % 4)
+	currentOffset += uint(toReturn.skippedCount)
 	toReturn.defaultOffset, e = Read32Bits(m, currentOffset)
 	if e != nil {
 		return nil, fmt.Errorf("Failed reading tableswitch default: %s", e)

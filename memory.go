@@ -9,7 +9,7 @@ import (
 type InvalidAddressError uint
 
 func (e InvalidAddressError) Error() string {
-	return fmt.Sprintf("Invalid address: 0x%x", e)
+	return fmt.Sprintf("Invalid address: 0x%x", uint(e))
 }
 
 // A generic interface for accessing JVM memories. Returns an error if an
@@ -50,18 +50,26 @@ type basicJVMMemory struct {
 }
 
 func (m *basicJVMMemory) GetByte(address uint) (uint8, error) {
-	if address > uint(len(m.memory)) {
+	if address >= uint(len(m.memory)) {
 		return 0, InvalidAddressError(address)
 	}
 	return m.memory[address], nil
 }
 
 func (m *basicJVMMemory) SetByte(value uint8, address uint) error {
-	if address > uint(len(m.memory)) {
+	if address >= uint(len(m.memory)) {
 		return InvalidAddressError(address)
 	}
 	m.memory[address] = value
 	return nil
+}
+
+// Returns a JVM memory-compatible wrapper around a byte slice, where the first
+// byte is at address 0.
+func JVMMemoryFromSlice(data []byte) JVMMemory {
+	return &basicJVMMemory{
+		memory: data,
+	}
 }
 
 // Returns a basic implementation of the JVM memory struct, addressed starting

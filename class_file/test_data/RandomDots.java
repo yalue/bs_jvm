@@ -6,10 +6,28 @@ public class RandomDots {
 	private static Random rand;
 
 	private static char getDot() {
-		if (rand.nextInt(100) > 50) {
-			return '#';
+		char toReturn = ' ';
+		switch (rand.nextInt(11)) {
+			case 1:
+				toReturn = '$';
+				break;
+			case 2:
+				toReturn = '%';
+				break;
+			case 3:
+				toReturn = '^';
+				break;
+			case 4:
+				toReturn = '&';
+				break;
+			case 5:
+				toReturn = '*';
+				break;
+			default:
+				toReturn = ' ';
+				break;
 		}
-		return ' ';
+		return toReturn;
 	}
 
 	public static void main(String[] args) {
