@@ -63,7 +63,7 @@ func (f *Field) String() string {
 }
 
 // Parses a single field structure.
-func (c *ClassFile) parseSingleField(data io.Reader) (*Field, error) {
+func (c *Class) parseSingleField(data io.Reader) (*Field, error) {
 	var toReturn Field
 	e := binary.Read(data, binary.BigEndian, &(toReturn.Access))
 	if e != nil {
@@ -101,7 +101,7 @@ func (c *ClassFile) parseSingleField(data io.Reader) (*Field, error) {
 
 // Assumes input is directly before a table of Field structures. Parses and
 // returns the fields.
-func (c *ClassFile) parseFieldTable(data io.Reader, count uint16) ([]*Field,
+func (c *Class) parseFieldTable(data io.Reader, count uint16) ([]*Field,
 	error) {
 	var e error
 	var field *Field

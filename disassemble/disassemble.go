@@ -28,7 +28,7 @@ func (m methodCode) SetByte(value uint8, address uint) error {
 // Prints the disassembly for a method's code.
 func printDisassembly(codeBytes []byte) error {
 	var e error
-	var instruction jvm.JVMInstruction
+	var instruction jvm.Instruction
 	code := methodCode(codeBytes)
 	address := uint(0)
 	for address < uint(len(code)) {

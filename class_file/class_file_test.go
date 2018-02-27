@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func getTestClassFile(t *testing.T) io.Reader {
+func getTestClass(t *testing.T) io.Reader {
 	content, e := ioutil.ReadFile("test_data/RandomDots.class")
 	if e != nil {
 		t.Logf("Failed reading the test class file: %s\n", e)
@@ -16,9 +16,9 @@ func getTestClassFile(t *testing.T) io.Reader {
 	return bytes.NewReader(content)
 }
 
-func getParsedClassFile(t *testing.T) *ClassFile {
-	content := getTestClassFile(t)
-	toReturn, e := ParseClassFile(content)
+func getParsedClass(t *testing.T) *Class {
+	content := getTestClass(t)
+	toReturn, e := ParseClass(content)
 	if e != nil {
 		t.Logf("Failed parsing the class file: %s\n", e)
 		t.FailNow()
@@ -26,8 +26,8 @@ func getParsedClassFile(t *testing.T) *ClassFile {
 	return toReturn
 }
 
-func TestParseClassFile(t *testing.T) {
-	class := getParsedClassFile(t)
+func TestParseClass(t *testing.T) {
+	class := getParsedClass(t)
 	if len(class.Fields) != 3 {
 		t.Logf("Expected 3 fields, got %d\n", len(class.Fields))
 		t.Fail()
@@ -47,8 +47,22 @@ func TestParseClassFile(t *testing.T) {
 	}
 }
 
+func TestGetClassName(t *testing.T) {
+	class := getParsedClass(t)
+	name, e := class.GetName()
+	if e != nil {
+		t.Logf("Failed getting test class name: %s\n", e)
+		t.FailNow()
+	}
+	t.Logf("Got test class name: %s\n", name)
+	if string(name) != "RandomDots" {
+		t.Logf("Got incorrect class name, expected \"RandomDots\"\n")
+		t.Fail()
+	}
+}
+
 func TestParseCodeAttributes(t *testing.T) {
-	class := getParsedClassFile(t)
+	class := getParsedClass(t)
 	var codeAttribute *Attribute
 	var parsedCodeAttribute *CodeAttribute
 	var e error
@@ -78,7 +92,7 @@ func TestParseCodeAttributes(t *testing.T) {
 }
 
 func TestParseStackMapFrameAttributes(t *testing.T) {
-	class := getParsedClassFile(t)
+	class := getParsedClass(t)
 	var code *CodeAttribute
 	var e error
 	var frames []StackMapFrame

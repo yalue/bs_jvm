@@ -34,7 +34,7 @@ type ConstantValueAttribute struct {
 	Value Constant
 }
 
-func (a *Attribute) ToConstantValueAttribute(c *ClassFile) (
+func (a *Attribute) ToConstantValueAttribute(c *Class) (
 	*ConstantValueAttribute, error) {
 	if len(a.Info) != 2 {
 		return nil, fmt.Errorf("Constant value attributes must be 2 bytes.")
@@ -56,7 +56,7 @@ type CodeAttribute struct {
 	Attributes     []*Attribute
 }
 
-func ParseCodeAttribute(a *Attribute, c *ClassFile) (*CodeAttribute, error) {
+func ParseCodeAttribute(a *Attribute, c *Class) (*CodeAttribute, error) {
 	var toReturn CodeAttribute
 	var e error
 	data := bytes.NewReader(a.Info)
@@ -354,7 +354,7 @@ func ParseMethodParametersAttribute(a *Attribute) ([]MethodParameter, error) {
 
 // Assumes the data reader is at the start of a class file attribute struct.
 // Parses and returns the struct, or an error if one occurs.
-func (c *ClassFile) parseSingleAttribute(data io.Reader) (*Attribute, error) {
+func (c *Class) parseSingleAttribute(data io.Reader) (*Attribute, error) {
 	var toReturn Attribute
 	var index uint16
 	e := binary.Read(data, binary.BigEndian, &index)
@@ -381,7 +381,7 @@ func (c *ClassFile) parseSingleAttribute(data io.Reader) (*Attribute, error) {
 
 // Assumes the data input is at the start of an attribute table in the class
 // file. Reads and parses the attributes in the table.
-func (c *ClassFile) parseAttributesTable(data io.Reader,
+func (c *Class) parseAttributesTable(data io.Reader,
 	count uint16) ([]*Attribute, error) {
 	var e error
 	var attribute *Attribute

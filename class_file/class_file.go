@@ -51,7 +51,7 @@ func (f ClassAccessFlags) String() string {
 }
 
 // Holds relevant data from a parsed class file.
-type ClassFile struct {
+type Class struct {
 	MinorVersion uint16
 	MajorVersion uint16
 	Constants    []Constant
@@ -69,7 +69,7 @@ type ClassFile struct {
 
 // Returns the constant with the given index, or an error if the index is
 // invalid.
-func (c *ClassFile) GetConstant(index uint16) (Constant, error) {
+func (c *Class) GetConstant(index uint16) (Constant, error) {
 	if index == 0 {
 		return nil, fmt.Errorf("Constant indices must be greater than 0")
 	}
@@ -85,7 +85,7 @@ func (c *ClassFile) GetConstant(index uint16) (Constant, error) {
 
 // Returns the constant at the given index, but only if it as a UTF-8 string.
 // Returns an error in any other case.
-func (c *ClassFile) GetUTF8Constant(index uint16) ([]byte, error) {
+func (c *Class) GetUTF8Constant(index uint16) ([]byte, error) {
 	value, e := c.GetConstant(index)
 	if e != nil {
 		return nil, e
@@ -97,9 +97,32 @@ func (c *ClassFile) GetUTF8Constant(index uint16) ([]byte, error) {
 	return toReturn.Bytes, nil
 }
 
+// Returns the class' name as a slice of UTF-8 bytes.
+func (c *Class) GetName() ([]byte, error) {
+	infoConstant, e := c.GetConstant(c.ThisClass)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't get class info constant: %s", e)
+	}
+	classInfo, ok := infoConstant.(*ConstantClassInfo)
+	if !ok {
+		return nil, fmt.Errorf("Got incorrect info constant type (got %s)",
+			infoConstant.String())
+	}
+	nameConstant, e := c.GetConstant(classInfo.NameIndex)
+	if e != nil {
+		return nil, fmt.Errorf("Failed getting class name constant: %s", e)
+	}
+	name, ok := nameConstant.(*ConstantUTF8Info)
+	if !ok {
+		return nil, fmt.Errorf("Got incorrect name constant type (got %s)",
+			nameConstant.String())
+	}
+	return name.Bytes, nil
+}
+
 // Parses a class file; returns an error if the file is not valid.
-func ParseClassFile(data io.Reader) (*ClassFile, error) {
-	var toReturn ClassFile
+func ParseClass(data io.Reader) (*Class, error) {
+	var toReturn Class
 	var magic uint32
 	e := binary.Read(data, binary.BigEndian, &magic)
 	if e != nil {

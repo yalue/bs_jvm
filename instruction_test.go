@@ -6,14 +6,14 @@ import (
 	"testing"
 )
 
-func getTestClassFile(t *testing.T) *class_file.ClassFile {
+func getTestClass(t *testing.T) *class_file.Class {
 	file, e := os.Open("class_file/test_data/RandomDots.class")
 	if e != nil {
 		t.Logf("Failed opening the test class file: %s\n", e)
 		t.FailNow()
 	}
 	defer file.Close()
-	toReturn, e := class_file.ParseClassFile(file)
+	toReturn, e := class_file.ParseClass(file)
 	if e != nil {
 		t.Logf("Failed parsing the test class file: %s\n", e)
 		t.FailNow()
@@ -21,7 +21,7 @@ func getTestClassFile(t *testing.T) *class_file.ClassFile {
 	return toReturn
 }
 
-func getRandomDotMethodCode(t *testing.T, class *class_file.ClassFile) []byte {
+func getRandomDotMethodCode(t *testing.T, class *class_file.Class) []byte {
 	var method *class_file.Method
 	for i := range class.Methods {
 		if string(class.Methods[i].Name) == "getDot" {
@@ -45,10 +45,10 @@ func getRandomDotMethodCode(t *testing.T, class *class_file.ClassFile) []byte {
 
 func TestGetNextInstruction(t *testing.T) {
 	var e error
-	classFile := getTestClassFile(t)
-	codeBytes := getRandomDotMethodCode(t, classFile)
-	codeMemory := JVMMemoryFromSlice(codeBytes)
-	var instruction JVMInstruction
+	class := getTestClass(t)
+	codeBytes := getRandomDotMethodCode(t, class)
+	codeMemory := MemoryFromSlice(codeBytes)
+	var instruction Instruction
 	address := uint(0)
 	t.Logf("getDot disassembly:\n")
 	for address < uint(len(codeBytes)) {

@@ -76,7 +76,7 @@ func (m *Method) String() string {
 // Returns an error if one occurs. This will scan the method's attributes table
 // and parse the Code attribute, so this shouldn't be called frequently to
 // preserve performance.
-func (m *Method) GetCodeAttribute(class *ClassFile) (*CodeAttribute, error) {
+func (m *Method) GetCodeAttribute(class *Class) (*CodeAttribute, error) {
 	found := false
 	var e error
 	var codeAttribute *CodeAttribute
@@ -98,7 +98,7 @@ func (m *Method) GetCodeAttribute(class *ClassFile) (*CodeAttribute, error) {
 }
 
 // Parses a single method structure.
-func (c *ClassFile) parseSingleMethod(data io.Reader) (*Method, error) {
+func (c *Class) parseSingleMethod(data io.Reader) (*Method, error) {
 	var toReturn Method
 	e := binary.Read(data, binary.BigEndian, &(toReturn.Access))
 	if e != nil {
@@ -136,7 +136,7 @@ func (c *ClassFile) parseSingleMethod(data io.Reader) (*Method, error) {
 
 // Assumes input is directly before a table of Method structures. Parses and
 // returns the methods.
-func (c *ClassFile) parseMethodTable(data io.Reader, count uint16) ([]*Method,
+func (c *Class) parseMethodTable(data io.Reader, count uint16) ([]*Method,
 	error) {
 	var e error
 	var method *Method

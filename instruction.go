@@ -6,17 +6,8 @@ import (
 	"fmt"
 )
 
-// This error is returned if an unknown/unsupported opcode is encountered.
-type UnknownInstructionError uint8
-
-func (e UnknownInstructionError) Error() string {
-	return fmt.Sprintf("Unknown/bad JVM opcode: 0x%02x", e)
-}
-
-var NotImplementedError = fmt.Errorf("Support not implemented")
-
 // The interface through which JVM opcodes can be inspected or executed.
-type JVMInstruction interface {
+type Instruction interface {
 	// Returns the 8-bit opcode for the instruction
 	Raw() uint8
 	// Returns additional bytes following the instruction's 8-bit opcode, or
@@ -28,9 +19,9 @@ type JVMInstruction interface {
 	// during an optimization pass before execution. It should be treated as
 	// optional, so Execute(..) should function regardless of whether this has
 	// been called.
-	Optimize(m *JVMMethod, offset uint) error
+	Optimize(m *Method, offset uint) error
 	// Runs the instruction in the given thread
-	Execute(t JVMThread) error
+	Execute(t Thread) error
 	// Returns the length of the instruction, including the opcode and
 	// additional argument bytes.
 	Length() uint
@@ -38,69 +29,71 @@ type JVMInstruction interface {
 	String() string
 }
 
-// Provices a default implementation of the JVMInstruction interface.
-type unknownJVMInstruction struct {
+// Provices a default implementation of the Instruction interface.
+type unknownInstruction struct {
 	raw uint8
 }
 
-func (n *unknownJVMInstruction) Raw() uint8 {
+func (n *unknownInstruction) Raw() uint8 {
 	return n.raw
 }
 
-func (n *unknownJVMInstruction) OtherBytes() []byte {
+func (n *unknownInstruction) OtherBytes() []byte {
 	return nil
 }
 
-func (n *unknownJVMInstruction) Length() uint {
+func (n *unknownInstruction) Length() uint {
 	return 1
 }
 
-func (n *unknownJVMInstruction) Optimize(m *JVMMethod, offset uint) error {
+func (n *unknownInstruction) Optimize(m *Method, offset uint) error {
 	return nil
 }
 
-func (n *unknownJVMInstruction) Execute(t JVMThread) error {
+func (n *unknownInstruction) Execute(t Thread) error {
 	return UnknownInstructionError(n.raw)
 }
 
-func (n *unknownJVMInstruction) String() string {
+func (n *unknownInstruction) String() string {
 	return fmt.Sprintf("<unknown instruction 0x%02x>", n.raw)
 }
 
-// Like unknownJVMInstruction, but contains an instruction string. Used for
+// Like unknownInstruction, but contains an instruction string. Used for
 // known instructions which only consist of one byte.
-type knownJVMInstruction struct {
+type knownInstruction struct {
 	raw  uint8
 	name string
 }
 
-func (n *knownJVMInstruction) Raw() uint8 {
+func (n *knownInstruction) Raw() uint8 {
 	return n.raw
 }
 
-func (n *knownJVMInstruction) OtherBytes() []byte {
+func (n *knownInstruction) OtherBytes() []byte {
 	return nil
 }
 
-func (n *knownJVMInstruction) Length() uint {
+func (n *knownInstruction) Length() uint {
 	return 1
 }
 
-func (n *knownJVMInstruction) Execute(t JVMThread) error {
+func (n *knownInstruction) Optimize(m *Method, offset uint) error {
+	return nil
+}
+
+func (n *knownInstruction) Execute(t Thread) error {
 	return fmt.Errorf("Execution not implemented for %s", n.String())
 }
 
-func (n *knownJVMInstruction) String() string {
+func (n *knownInstruction) String() string {
 	return n.name
 }
 
-// Returns the instruction starting at the given address. Only returns an error
-// if the address is invalid. If an invalid/unknown instruction is located at
-// the address, then a JVMInstruction will still be returned, but it will
-// produce an UnknownInstructionError if executed.
-// TODO: Should this behavior be changed? Would it be better to just crash on
-// reading?
-func GetNextInstruction(m JVMMemory, address uint) (JVMInstruction, error) {
+// Returns the instruction starting at the given address. Returns an error if
+// the address is invalid. If an invalid/unknown instruction is located at the
+// address, then a Instruction will still be returned, but it will produce
+// an UnknownInstructionError if executed.
+func GetNextInstruction(m Memory, address uint) (Instruction, error) {
 	firstByte, e := m.GetByte(address)
 	if e != nil {
 		return nil, e
@@ -108,7 +101,7 @@ func GetNextInstruction(m JVMMemory, address uint) (JVMInstruction, error) {
 	opcodeInfo := opcodeTable[firstByte]
 	// Unknown instruction.
 	if opcodeInfo == nil {
-		toReturn := &unknownJVMInstruction{
+		toReturn := &unknownInstruction{
 			raw: firstByte,
 		}
 		return toReturn, nil
@@ -121,12 +114,12 @@ func GetNextInstruction(m JVMMemory, address uint) (JVMInstruction, error) {
 	return toReturn, nil
 }
 
-type nopInstruction struct{ knownJVMInstruction }
+type nopInstruction struct{ knownInstruction }
 
 func parseNopInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := nopInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x00,
 			name: name,
 		},
@@ -134,12 +127,12 @@ func parseNopInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type aconst_nullInstruction struct{ knownJVMInstruction }
+type aconst_nullInstruction struct{ knownInstruction }
 
 func parseAconst_nullInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := aconst_nullInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x01,
 			name: name,
 		},
@@ -147,12 +140,12 @@ func parseAconst_nullInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iconst_m1Instruction struct{ knownJVMInstruction }
+type iconst_m1Instruction struct{ knownInstruction }
 
 func parseIconst_m1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iconst_m1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x02,
 			name: name,
 		},
@@ -160,12 +153,12 @@ func parseIconst_m1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iconst_0Instruction struct{ knownJVMInstruction }
+type iconst_0Instruction struct{ knownInstruction }
 
 func parseIconst_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iconst_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x03,
 			name: name,
 		},
@@ -173,12 +166,12 @@ func parseIconst_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iconst_1Instruction struct{ knownJVMInstruction }
+type iconst_1Instruction struct{ knownInstruction }
 
 func parseIconst_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iconst_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x04,
 			name: name,
 		},
@@ -186,12 +179,12 @@ func parseIconst_1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iconst_2Instruction struct{ knownJVMInstruction }
+type iconst_2Instruction struct{ knownInstruction }
 
 func parseIconst_2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iconst_2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x05,
 			name: name,
 		},
@@ -199,12 +192,12 @@ func parseIconst_2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iconst_3Instruction struct{ knownJVMInstruction }
+type iconst_3Instruction struct{ knownInstruction }
 
 func parseIconst_3Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iconst_3Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x06,
 			name: name,
 		},
@@ -212,12 +205,12 @@ func parseIconst_3Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iconst_4Instruction struct{ knownJVMInstruction }
+type iconst_4Instruction struct{ knownInstruction }
 
 func parseIconst_4Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iconst_4Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x07,
 			name: name,
 		},
@@ -225,12 +218,12 @@ func parseIconst_4Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iconst_5Instruction struct{ knownJVMInstruction }
+type iconst_5Instruction struct{ knownInstruction }
 
 func parseIconst_5Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iconst_5Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x08,
 			name: name,
 		},
@@ -238,12 +231,12 @@ func parseIconst_5Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lconst_0Instruction struct{ knownJVMInstruction }
+type lconst_0Instruction struct{ knownInstruction }
 
 func parseLconst_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lconst_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x09,
 			name: name,
 		},
@@ -251,12 +244,12 @@ func parseLconst_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lconst_1Instruction struct{ knownJVMInstruction }
+type lconst_1Instruction struct{ knownInstruction }
 
 func parseLconst_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lconst_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x0a,
 			name: name,
 		},
@@ -264,12 +257,12 @@ func parseLconst_1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fconst_0Instruction struct{ knownJVMInstruction }
+type fconst_0Instruction struct{ knownInstruction }
 
 func parseFconst_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fconst_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x0b,
 			name: name,
 		},
@@ -277,12 +270,12 @@ func parseFconst_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fconst_1Instruction struct{ knownJVMInstruction }
+type fconst_1Instruction struct{ knownInstruction }
 
 func parseFconst_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fconst_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x0c,
 			name: name,
 		},
@@ -290,12 +283,12 @@ func parseFconst_1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fconst_2Instruction struct{ knownJVMInstruction }
+type fconst_2Instruction struct{ knownInstruction }
 
 func parseFconst_2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fconst_2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x0d,
 			name: name,
 		},
@@ -303,12 +296,12 @@ func parseFconst_2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dconst_0Instruction struct{ knownJVMInstruction }
+type dconst_0Instruction struct{ knownInstruction }
 
 func parseDconst_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dconst_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x0e,
 			name: name,
 		},
@@ -316,12 +309,12 @@ func parseDconst_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dconst_1Instruction struct{ knownJVMInstruction }
+type dconst_1Instruction struct{ knownInstruction }
 
 func parseDconst_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dconst_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x0f,
 			name: name,
 		},
@@ -338,7 +331,7 @@ type singleByteArgumentInstruction struct {
 }
 
 func parseSingleByteArgumentInstruction(opcode uint8, name string,
-	address uint, m JVMMemory) (*singleByteArgumentInstruction, error) {
+	address uint, m Memory) (*singleByteArgumentInstruction, error) {
 	value, e := m.GetByte(address + 1)
 	if e != nil {
 		return nil, fmt.Errorf("Failed reading argument byte for %s: %s", name,
@@ -364,6 +357,11 @@ func (n *singleByteArgumentInstruction) Length() uint {
 	return 2
 }
 
+func (n *singleByteArgumentInstruction) Optimize(m *Method,
+	offset uint) error {
+	return nil
+}
+
 func (n *singleByteArgumentInstruction) String() string {
 	return fmt.Sprintf("%s 0x%02x", n.name, n.value)
 }
@@ -371,7 +369,7 @@ func (n *singleByteArgumentInstruction) String() string {
 type bipushInstruction struct{ singleByteArgumentInstruction }
 
 func parseBipushInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -400,12 +398,16 @@ func (n *twoByteArgumentInstruction) Length() uint {
 	return 3
 }
 
+func (n *twoByteArgumentInstruction) Optimize(m *Method, offset uint) error {
+	return nil
+}
+
 func (n *twoByteArgumentInstruction) String() string {
 	return fmt.Sprintf("%s 0x%04x", n.name, n.value)
 }
 
 func parseTwoByteArgumentInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (*twoByteArgumentInstruction, error) {
+	m Memory) (*twoByteArgumentInstruction, error) {
 	value, e := Read16Bits(m, address+1)
 	if e != nil {
 		return nil, fmt.Errorf("Failed reading argument value for %s: %s",
@@ -422,7 +424,7 @@ func parseTwoByteArgumentInstruction(opcode uint8, name string, address uint,
 type sipushInstruction struct{ twoByteArgumentInstruction }
 
 func parseSipushInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -433,7 +435,7 @@ func parseSipushInstruction(opcode uint8, name string, address uint,
 type ldcInstruction struct{ singleByteArgumentInstruction }
 
 func parseLdcInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -444,7 +446,7 @@ func parseLdcInstruction(opcode uint8, name string, address uint,
 type ldc_wInstruction struct{ twoByteArgumentInstruction }
 
 func parseLdc_wInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -455,7 +457,7 @@ func parseLdc_wInstruction(opcode uint8, name string, address uint,
 type ldc2_wInstruction struct{ twoByteArgumentInstruction }
 
 func parseLdc2_wInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -466,7 +468,7 @@ func parseLdc2_wInstruction(opcode uint8, name string, address uint,
 type iloadInstruction struct{ singleByteArgumentInstruction }
 
 func parseIloadInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -477,7 +479,7 @@ func parseIloadInstruction(opcode uint8, name string, address uint,
 type lloadInstruction struct{ singleByteArgumentInstruction }
 
 func parseLloadInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -488,7 +490,7 @@ func parseLloadInstruction(opcode uint8, name string, address uint,
 type floadInstruction struct{ singleByteArgumentInstruction }
 
 func parseFloadInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -499,7 +501,7 @@ func parseFloadInstruction(opcode uint8, name string, address uint,
 type dloadInstruction struct{ singleByteArgumentInstruction }
 
 func parseDloadInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -510,7 +512,7 @@ func parseDloadInstruction(opcode uint8, name string, address uint,
 type aloadInstruction struct{ singleByteArgumentInstruction }
 
 func parseAloadInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -518,12 +520,12 @@ func parseAloadInstruction(opcode uint8, name string, address uint,
 	return &aloadInstruction{*toReturn}, nil
 }
 
-type iload_0Instruction struct{ knownJVMInstruction }
+type iload_0Instruction struct{ knownInstruction }
 
 func parseIload_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iload_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x1a,
 			name: name,
 		},
@@ -531,12 +533,12 @@ func parseIload_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iload_1Instruction struct{ knownJVMInstruction }
+type iload_1Instruction struct{ knownInstruction }
 
 func parseIload_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iload_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x1b,
 			name: name,
 		},
@@ -544,12 +546,12 @@ func parseIload_1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iload_2Instruction struct{ knownJVMInstruction }
+type iload_2Instruction struct{ knownInstruction }
 
 func parseIload_2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iload_2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x1c,
 			name: name,
 		},
@@ -557,12 +559,12 @@ func parseIload_2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iload_3Instruction struct{ knownJVMInstruction }
+type iload_3Instruction struct{ knownInstruction }
 
 func parseIload_3Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iload_3Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x1d,
 			name: name,
 		},
@@ -570,12 +572,12 @@ func parseIload_3Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lload_0Instruction struct{ knownJVMInstruction }
+type lload_0Instruction struct{ knownInstruction }
 
 func parseLload_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lload_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x1e,
 			name: name,
 		},
@@ -583,12 +585,12 @@ func parseLload_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lload_1Instruction struct{ knownJVMInstruction }
+type lload_1Instruction struct{ knownInstruction }
 
 func parseLload_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lload_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x1f,
 			name: name,
 		},
@@ -596,12 +598,12 @@ func parseLload_1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lload_2Instruction struct{ knownJVMInstruction }
+type lload_2Instruction struct{ knownInstruction }
 
 func parseLload_2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lload_2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x20,
 			name: name,
 		},
@@ -609,12 +611,12 @@ func parseLload_2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lload_3Instruction struct{ knownJVMInstruction }
+type lload_3Instruction struct{ knownInstruction }
 
 func parseLload_3Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lload_3Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x21,
 			name: name,
 		},
@@ -622,12 +624,12 @@ func parseLload_3Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fload_0Instruction struct{ knownJVMInstruction }
+type fload_0Instruction struct{ knownInstruction }
 
 func parseFload_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fload_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x22,
 			name: name,
 		},
@@ -635,12 +637,12 @@ func parseFload_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fload_1Instruction struct{ knownJVMInstruction }
+type fload_1Instruction struct{ knownInstruction }
 
 func parseFload_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fload_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x23,
 			name: name,
 		},
@@ -648,12 +650,12 @@ func parseFload_1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fload_2Instruction struct{ knownJVMInstruction }
+type fload_2Instruction struct{ knownInstruction }
 
 func parseFload_2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fload_2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x24,
 			name: name,
 		},
@@ -661,12 +663,12 @@ func parseFload_2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fload_3Instruction struct{ knownJVMInstruction }
+type fload_3Instruction struct{ knownInstruction }
 
 func parseFload_3Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fload_3Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x25,
 			name: name,
 		},
@@ -674,12 +676,12 @@ func parseFload_3Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dload_0Instruction struct{ knownJVMInstruction }
+type dload_0Instruction struct{ knownInstruction }
 
 func parseDload_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dload_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x26,
 			name: name,
 		},
@@ -687,12 +689,12 @@ func parseDload_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dload_1Instruction struct{ knownJVMInstruction }
+type dload_1Instruction struct{ knownInstruction }
 
 func parseDload_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dload_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x27,
 			name: name,
 		},
@@ -700,12 +702,12 @@ func parseDload_1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dload_2Instruction struct{ knownJVMInstruction }
+type dload_2Instruction struct{ knownInstruction }
 
 func parseDload_2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dload_2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x28,
 			name: name,
 		},
@@ -713,12 +715,12 @@ func parseDload_2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dload_3Instruction struct{ knownJVMInstruction }
+type dload_3Instruction struct{ knownInstruction }
 
 func parseDload_3Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dload_3Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x29,
 			name: name,
 		},
@@ -726,12 +728,12 @@ func parseDload_3Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type aload_0Instruction struct{ knownJVMInstruction }
+type aload_0Instruction struct{ knownInstruction }
 
 func parseAload_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := aload_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x2a,
 			name: name,
 		},
@@ -739,12 +741,12 @@ func parseAload_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type aload_1Instruction struct{ knownJVMInstruction }
+type aload_1Instruction struct{ knownInstruction }
 
 func parseAload_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := aload_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x2b,
 			name: name,
 		},
@@ -752,12 +754,12 @@ func parseAload_1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type aload_2Instruction struct{ knownJVMInstruction }
+type aload_2Instruction struct{ knownInstruction }
 
 func parseAload_2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := aload_2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x2c,
 			name: name,
 		},
@@ -765,12 +767,12 @@ func parseAload_2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type aload_3Instruction struct{ knownJVMInstruction }
+type aload_3Instruction struct{ knownInstruction }
 
 func parseAload_3Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := aload_3Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x2d,
 			name: name,
 		},
@@ -778,12 +780,12 @@ func parseAload_3Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type ialoadInstruction struct{ knownJVMInstruction }
+type ialoadInstruction struct{ knownInstruction }
 
 func parseIaloadInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := ialoadInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x2e,
 			name: name,
 		},
@@ -791,12 +793,12 @@ func parseIaloadInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type laloadInstruction struct{ knownJVMInstruction }
+type laloadInstruction struct{ knownInstruction }
 
 func parseLaloadInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := laloadInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x2f,
 			name: name,
 		},
@@ -804,12 +806,12 @@ func parseLaloadInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type faloadInstruction struct{ knownJVMInstruction }
+type faloadInstruction struct{ knownInstruction }
 
 func parseFaloadInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := faloadInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x30,
 			name: name,
 		},
@@ -817,12 +819,12 @@ func parseFaloadInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type daloadInstruction struct{ knownJVMInstruction }
+type daloadInstruction struct{ knownInstruction }
 
 func parseDaloadInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := daloadInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x31,
 			name: name,
 		},
@@ -830,12 +832,12 @@ func parseDaloadInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type aaloadInstruction struct{ knownJVMInstruction }
+type aaloadInstruction struct{ knownInstruction }
 
 func parseAaloadInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := aaloadInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x32,
 			name: name,
 		},
@@ -843,12 +845,12 @@ func parseAaloadInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type baloadInstruction struct{ knownJVMInstruction }
+type baloadInstruction struct{ knownInstruction }
 
 func parseBaloadInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := baloadInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x33,
 			name: name,
 		},
@@ -856,12 +858,12 @@ func parseBaloadInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type caloadInstruction struct{ knownJVMInstruction }
+type caloadInstruction struct{ knownInstruction }
 
 func parseCaloadInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := caloadInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x34,
 			name: name,
 		},
@@ -869,12 +871,12 @@ func parseCaloadInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type saloadInstruction struct{ knownJVMInstruction }
+type saloadInstruction struct{ knownInstruction }
 
 func parseSaloadInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := saloadInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x35,
 			name: name,
 		},
@@ -885,7 +887,7 @@ func parseSaloadInstruction(opcode uint8, name string, address uint,
 type istoreInstruction struct{ singleByteArgumentInstruction }
 
 func parseIstoreInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -896,7 +898,7 @@ func parseIstoreInstruction(opcode uint8, name string, address uint,
 type lstoreInstruction struct{ singleByteArgumentInstruction }
 
 func parseLstoreInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -907,7 +909,7 @@ func parseLstoreInstruction(opcode uint8, name string, address uint,
 type fstoreInstruction struct{ singleByteArgumentInstruction }
 
 func parseFstoreInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -918,7 +920,7 @@ func parseFstoreInstruction(opcode uint8, name string, address uint,
 type dstoreInstruction struct{ singleByteArgumentInstruction }
 
 func parseDstoreInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -929,7 +931,7 @@ func parseDstoreInstruction(opcode uint8, name string, address uint,
 type astoreInstruction struct{ singleByteArgumentInstruction }
 
 func parseAstoreInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -937,12 +939,12 @@ func parseAstoreInstruction(opcode uint8, name string, address uint,
 	return &astoreInstruction{*toReturn}, nil
 }
 
-type istore_0Instruction struct{ knownJVMInstruction }
+type istore_0Instruction struct{ knownInstruction }
 
 func parseIstore_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := istore_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x3b,
 			name: name,
 		},
@@ -950,12 +952,12 @@ func parseIstore_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type istore_1Instruction struct{ knownJVMInstruction }
+type istore_1Instruction struct{ knownInstruction }
 
 func parseIstore_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := istore_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x3c,
 			name: name,
 		},
@@ -963,12 +965,12 @@ func parseIstore_1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type istore_2Instruction struct{ knownJVMInstruction }
+type istore_2Instruction struct{ knownInstruction }
 
 func parseIstore_2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := istore_2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x3d,
 			name: name,
 		},
@@ -976,12 +978,12 @@ func parseIstore_2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type istore_3Instruction struct{ knownJVMInstruction }
+type istore_3Instruction struct{ knownInstruction }
 
 func parseIstore_3Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := istore_3Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x3e,
 			name: name,
 		},
@@ -989,12 +991,12 @@ func parseIstore_3Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lstore_0Instruction struct{ knownJVMInstruction }
+type lstore_0Instruction struct{ knownInstruction }
 
 func parseLstore_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lstore_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x3f,
 			name: name,
 		},
@@ -1002,12 +1004,12 @@ func parseLstore_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lstore_1Instruction struct{ knownJVMInstruction }
+type lstore_1Instruction struct{ knownInstruction }
 
 func parseLstore_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lstore_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x40,
 			name: name,
 		},
@@ -1015,12 +1017,12 @@ func parseLstore_1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lstore_2Instruction struct{ knownJVMInstruction }
+type lstore_2Instruction struct{ knownInstruction }
 
 func parseLstore_2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lstore_2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x41,
 			name: name,
 		},
@@ -1028,12 +1030,12 @@ func parseLstore_2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lstore_3Instruction struct{ knownJVMInstruction }
+type lstore_3Instruction struct{ knownInstruction }
 
 func parseLstore_3Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lstore_3Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x42,
 			name: name,
 		},
@@ -1041,12 +1043,12 @@ func parseLstore_3Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fstore_0Instruction struct{ knownJVMInstruction }
+type fstore_0Instruction struct{ knownInstruction }
 
 func parseFstore_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fstore_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x43,
 			name: name,
 		},
@@ -1054,12 +1056,12 @@ func parseFstore_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fstore_1Instruction struct{ knownJVMInstruction }
+type fstore_1Instruction struct{ knownInstruction }
 
 func parseFstore_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fstore_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x44,
 			name: name,
 		},
@@ -1067,12 +1069,12 @@ func parseFstore_1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fstore_2Instruction struct{ knownJVMInstruction }
+type fstore_2Instruction struct{ knownInstruction }
 
 func parseFstore_2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fstore_2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x45,
 			name: name,
 		},
@@ -1080,12 +1082,12 @@ func parseFstore_2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fstore_3Instruction struct{ knownJVMInstruction }
+type fstore_3Instruction struct{ knownInstruction }
 
 func parseFstore_3Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fstore_3Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x46,
 			name: name,
 		},
@@ -1093,12 +1095,12 @@ func parseFstore_3Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dstore_0Instruction struct{ knownJVMInstruction }
+type dstore_0Instruction struct{ knownInstruction }
 
 func parseDstore_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dstore_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x47,
 			name: name,
 		},
@@ -1106,12 +1108,12 @@ func parseDstore_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dstore_1Instruction struct{ knownJVMInstruction }
+type dstore_1Instruction struct{ knownInstruction }
 
 func parseDstore_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dstore_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x48,
 			name: name,
 		},
@@ -1119,12 +1121,12 @@ func parseDstore_1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dstore_2Instruction struct{ knownJVMInstruction }
+type dstore_2Instruction struct{ knownInstruction }
 
 func parseDstore_2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dstore_2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x49,
 			name: name,
 		},
@@ -1132,12 +1134,12 @@ func parseDstore_2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dstore_3Instruction struct{ knownJVMInstruction }
+type dstore_3Instruction struct{ knownInstruction }
 
 func parseDstore_3Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dstore_3Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x4a,
 			name: name,
 		},
@@ -1145,12 +1147,12 @@ func parseDstore_3Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type astore_0Instruction struct{ knownJVMInstruction }
+type astore_0Instruction struct{ knownInstruction }
 
 func parseAstore_0Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := astore_0Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x4b,
 			name: name,
 		},
@@ -1158,12 +1160,12 @@ func parseAstore_0Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type astore_1Instruction struct{ knownJVMInstruction }
+type astore_1Instruction struct{ knownInstruction }
 
 func parseAstore_1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := astore_1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x4c,
 			name: name,
 		},
@@ -1171,12 +1173,12 @@ func parseAstore_1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type astore_2Instruction struct{ knownJVMInstruction }
+type astore_2Instruction struct{ knownInstruction }
 
 func parseAstore_2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := astore_2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x4d,
 			name: name,
 		},
@@ -1184,12 +1186,12 @@ func parseAstore_2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type astore_3Instruction struct{ knownJVMInstruction }
+type astore_3Instruction struct{ knownInstruction }
 
 func parseAstore_3Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := astore_3Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x4e,
 			name: name,
 		},
@@ -1197,12 +1199,12 @@ func parseAstore_3Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iastoreInstruction struct{ knownJVMInstruction }
+type iastoreInstruction struct{ knownInstruction }
 
 func parseIastoreInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iastoreInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x4f,
 			name: name,
 		},
@@ -1210,12 +1212,12 @@ func parseIastoreInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lastoreInstruction struct{ knownJVMInstruction }
+type lastoreInstruction struct{ knownInstruction }
 
 func parseLastoreInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lastoreInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x50,
 			name: name,
 		},
@@ -1223,12 +1225,12 @@ func parseLastoreInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fastoreInstruction struct{ knownJVMInstruction }
+type fastoreInstruction struct{ knownInstruction }
 
 func parseFastoreInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fastoreInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x51,
 			name: name,
 		},
@@ -1236,12 +1238,12 @@ func parseFastoreInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dastoreInstruction struct{ knownJVMInstruction }
+type dastoreInstruction struct{ knownInstruction }
 
 func parseDastoreInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dastoreInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x52,
 			name: name,
 		},
@@ -1249,12 +1251,12 @@ func parseDastoreInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type aastoreInstruction struct{ knownJVMInstruction }
+type aastoreInstruction struct{ knownInstruction }
 
 func parseAastoreInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := aastoreInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x53,
 			name: name,
 		},
@@ -1262,12 +1264,12 @@ func parseAastoreInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type bastoreInstruction struct{ knownJVMInstruction }
+type bastoreInstruction struct{ knownInstruction }
 
 func parseBastoreInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := bastoreInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x54,
 			name: name,
 		},
@@ -1275,12 +1277,12 @@ func parseBastoreInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type castoreInstruction struct{ knownJVMInstruction }
+type castoreInstruction struct{ knownInstruction }
 
 func parseCastoreInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := castoreInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x55,
 			name: name,
 		},
@@ -1288,12 +1290,12 @@ func parseCastoreInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type sastoreInstruction struct{ knownJVMInstruction }
+type sastoreInstruction struct{ knownInstruction }
 
 func parseSastoreInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := sastoreInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x56,
 			name: name,
 		},
@@ -1301,12 +1303,12 @@ func parseSastoreInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type popInstruction struct{ knownJVMInstruction }
+type popInstruction struct{ knownInstruction }
 
 func parsePopInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := popInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x57,
 			name: name,
 		},
@@ -1314,12 +1316,12 @@ func parsePopInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type pop2Instruction struct{ knownJVMInstruction }
+type pop2Instruction struct{ knownInstruction }
 
 func parsePop2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := pop2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x58,
 			name: name,
 		},
@@ -1327,12 +1329,12 @@ func parsePop2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dupInstruction struct{ knownJVMInstruction }
+type dupInstruction struct{ knownInstruction }
 
 func parseDupInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dupInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x59,
 			name: name,
 		},
@@ -1340,12 +1342,12 @@ func parseDupInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dup_x1Instruction struct{ knownJVMInstruction }
+type dup_x1Instruction struct{ knownInstruction }
 
 func parseDup_x1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dup_x1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x5a,
 			name: name,
 		},
@@ -1353,12 +1355,12 @@ func parseDup_x1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dup_x2Instruction struct{ knownJVMInstruction }
+type dup_x2Instruction struct{ knownInstruction }
 
 func parseDup_x2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dup_x2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x5b,
 			name: name,
 		},
@@ -1366,12 +1368,12 @@ func parseDup_x2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dup2Instruction struct{ knownJVMInstruction }
+type dup2Instruction struct{ knownInstruction }
 
 func parseDup2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dup2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x5c,
 			name: name,
 		},
@@ -1379,12 +1381,12 @@ func parseDup2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dup2_x1Instruction struct{ knownJVMInstruction }
+type dup2_x1Instruction struct{ knownInstruction }
 
 func parseDup2_x1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dup2_x1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x5d,
 			name: name,
 		},
@@ -1392,12 +1394,12 @@ func parseDup2_x1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dup2_x2Instruction struct{ knownJVMInstruction }
+type dup2_x2Instruction struct{ knownInstruction }
 
 func parseDup2_x2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dup2_x2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x5e,
 			name: name,
 		},
@@ -1405,12 +1407,12 @@ func parseDup2_x2Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type swapInstruction struct{ knownJVMInstruction }
+type swapInstruction struct{ knownInstruction }
 
 func parseSwapInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := swapInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x5f,
 			name: name,
 		},
@@ -1418,12 +1420,12 @@ func parseSwapInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iaddInstruction struct{ knownJVMInstruction }
+type iaddInstruction struct{ knownInstruction }
 
 func parseIaddInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iaddInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x60,
 			name: name,
 		},
@@ -1431,12 +1433,12 @@ func parseIaddInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type laddInstruction struct{ knownJVMInstruction }
+type laddInstruction struct{ knownInstruction }
 
 func parseLaddInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := laddInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x61,
 			name: name,
 		},
@@ -1444,12 +1446,12 @@ func parseLaddInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type faddInstruction struct{ knownJVMInstruction }
+type faddInstruction struct{ knownInstruction }
 
 func parseFaddInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := faddInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x62,
 			name: name,
 		},
@@ -1457,12 +1459,12 @@ func parseFaddInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type daddInstruction struct{ knownJVMInstruction }
+type daddInstruction struct{ knownInstruction }
 
 func parseDaddInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := daddInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x63,
 			name: name,
 		},
@@ -1470,12 +1472,12 @@ func parseDaddInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type isubInstruction struct{ knownJVMInstruction }
+type isubInstruction struct{ knownInstruction }
 
 func parseIsubInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := isubInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x64,
 			name: name,
 		},
@@ -1483,12 +1485,12 @@ func parseIsubInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lsubInstruction struct{ knownJVMInstruction }
+type lsubInstruction struct{ knownInstruction }
 
 func parseLsubInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lsubInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x65,
 			name: name,
 		},
@@ -1496,12 +1498,12 @@ func parseLsubInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fsubInstruction struct{ knownJVMInstruction }
+type fsubInstruction struct{ knownInstruction }
 
 func parseFsubInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fsubInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x66,
 			name: name,
 		},
@@ -1509,12 +1511,12 @@ func parseFsubInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dsubInstruction struct{ knownJVMInstruction }
+type dsubInstruction struct{ knownInstruction }
 
 func parseDsubInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dsubInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x67,
 			name: name,
 		},
@@ -1522,12 +1524,12 @@ func parseDsubInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type imulInstruction struct{ knownJVMInstruction }
+type imulInstruction struct{ knownInstruction }
 
 func parseImulInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := imulInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x68,
 			name: name,
 		},
@@ -1535,12 +1537,12 @@ func parseImulInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lmulInstruction struct{ knownJVMInstruction }
+type lmulInstruction struct{ knownInstruction }
 
 func parseLmulInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lmulInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x69,
 			name: name,
 		},
@@ -1548,12 +1550,12 @@ func parseLmulInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fmulInstruction struct{ knownJVMInstruction }
+type fmulInstruction struct{ knownInstruction }
 
 func parseFmulInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fmulInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x6a,
 			name: name,
 		},
@@ -1561,12 +1563,12 @@ func parseFmulInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dmulInstruction struct{ knownJVMInstruction }
+type dmulInstruction struct{ knownInstruction }
 
 func parseDmulInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dmulInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x6b,
 			name: name,
 		},
@@ -1574,12 +1576,12 @@ func parseDmulInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type idivInstruction struct{ knownJVMInstruction }
+type idivInstruction struct{ knownInstruction }
 
 func parseIdivInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := idivInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x6c,
 			name: name,
 		},
@@ -1587,12 +1589,12 @@ func parseIdivInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type ldivInstruction struct{ knownJVMInstruction }
+type ldivInstruction struct{ knownInstruction }
 
 func parseLdivInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := ldivInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x6d,
 			name: name,
 		},
@@ -1600,12 +1602,12 @@ func parseLdivInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fdivInstruction struct{ knownJVMInstruction }
+type fdivInstruction struct{ knownInstruction }
 
 func parseFdivInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fdivInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x6e,
 			name: name,
 		},
@@ -1613,12 +1615,12 @@ func parseFdivInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type ddivInstruction struct{ knownJVMInstruction }
+type ddivInstruction struct{ knownInstruction }
 
 func parseDdivInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := ddivInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x6f,
 			name: name,
 		},
@@ -1626,12 +1628,12 @@ func parseDdivInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iremInstruction struct{ knownJVMInstruction }
+type iremInstruction struct{ knownInstruction }
 
 func parseIremInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iremInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x70,
 			name: name,
 		},
@@ -1639,12 +1641,12 @@ func parseIremInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lremInstruction struct{ knownJVMInstruction }
+type lremInstruction struct{ knownInstruction }
 
 func parseLremInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lremInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x71,
 			name: name,
 		},
@@ -1652,12 +1654,12 @@ func parseLremInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fremInstruction struct{ knownJVMInstruction }
+type fremInstruction struct{ knownInstruction }
 
 func parseFremInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fremInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x72,
 			name: name,
 		},
@@ -1665,12 +1667,12 @@ func parseFremInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dremInstruction struct{ knownJVMInstruction }
+type dremInstruction struct{ knownInstruction }
 
 func parseDremInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dremInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x73,
 			name: name,
 		},
@@ -1678,12 +1680,12 @@ func parseDremInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type inegInstruction struct{ knownJVMInstruction }
+type inegInstruction struct{ knownInstruction }
 
 func parseInegInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := inegInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x74,
 			name: name,
 		},
@@ -1691,12 +1693,12 @@ func parseInegInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lnegInstruction struct{ knownJVMInstruction }
+type lnegInstruction struct{ knownInstruction }
 
 func parseLnegInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lnegInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x75,
 			name: name,
 		},
@@ -1704,12 +1706,12 @@ func parseLnegInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fnegInstruction struct{ knownJVMInstruction }
+type fnegInstruction struct{ knownInstruction }
 
 func parseFnegInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fnegInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x76,
 			name: name,
 		},
@@ -1717,12 +1719,12 @@ func parseFnegInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dnegInstruction struct{ knownJVMInstruction }
+type dnegInstruction struct{ knownInstruction }
 
 func parseDnegInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dnegInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x77,
 			name: name,
 		},
@@ -1730,12 +1732,12 @@ func parseDnegInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type ishlInstruction struct{ knownJVMInstruction }
+type ishlInstruction struct{ knownInstruction }
 
 func parseIshlInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := ishlInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x78,
 			name: name,
 		},
@@ -1743,12 +1745,12 @@ func parseIshlInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lshlInstruction struct{ knownJVMInstruction }
+type lshlInstruction struct{ knownInstruction }
 
 func parseLshlInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lshlInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x79,
 			name: name,
 		},
@@ -1756,12 +1758,12 @@ func parseLshlInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type ishrInstruction struct{ knownJVMInstruction }
+type ishrInstruction struct{ knownInstruction }
 
 func parseIshrInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := ishrInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x7a,
 			name: name,
 		},
@@ -1769,12 +1771,12 @@ func parseIshrInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lshrInstruction struct{ knownJVMInstruction }
+type lshrInstruction struct{ knownInstruction }
 
 func parseLshrInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lshrInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x7b,
 			name: name,
 		},
@@ -1782,12 +1784,12 @@ func parseLshrInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iushrInstruction struct{ knownJVMInstruction }
+type iushrInstruction struct{ knownInstruction }
 
 func parseIushrInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iushrInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x7c,
 			name: name,
 		},
@@ -1795,12 +1797,12 @@ func parseIushrInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lushrInstruction struct{ knownJVMInstruction }
+type lushrInstruction struct{ knownInstruction }
 
 func parseLushrInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lushrInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x7d,
 			name: name,
 		},
@@ -1808,12 +1810,12 @@ func parseLushrInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iandInstruction struct{ knownJVMInstruction }
+type iandInstruction struct{ knownInstruction }
 
 func parseIandInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iandInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x7e,
 			name: name,
 		},
@@ -1821,12 +1823,12 @@ func parseIandInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type landInstruction struct{ knownJVMInstruction }
+type landInstruction struct{ knownInstruction }
 
 func parseLandInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := landInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x7f,
 			name: name,
 		},
@@ -1834,12 +1836,12 @@ func parseLandInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type iorInstruction struct{ knownJVMInstruction }
+type iorInstruction struct{ knownInstruction }
 
 func parseIorInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := iorInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x80,
 			name: name,
 		},
@@ -1847,12 +1849,12 @@ func parseIorInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lorInstruction struct{ knownJVMInstruction }
+type lorInstruction struct{ knownInstruction }
 
 func parseLorInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lorInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x81,
 			name: name,
 		},
@@ -1860,12 +1862,12 @@ func parseLorInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type ixorInstruction struct{ knownJVMInstruction }
+type ixorInstruction struct{ knownInstruction }
 
 func parseIxorInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := ixorInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x82,
 			name: name,
 		},
@@ -1873,12 +1875,12 @@ func parseIxorInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lxorInstruction struct{ knownJVMInstruction }
+type lxorInstruction struct{ knownInstruction }
 
 func parseLxorInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lxorInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x83,
 			name: name,
 		},
@@ -1904,12 +1906,16 @@ func (n *iincInstruction) Length() uint {
 	return 3
 }
 
+func (n *iincInstruction) Optimize(m *Method, offset uint) error {
+	return nil
+}
+
 func (n *iincInstruction) String() string {
 	return fmt.Sprintf("iinc 0x%02x 0x%02x", n.offset, n.value)
 }
 
 func parseIincInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	offset, e := m.GetByte(address + 1)
 	if e != nil {
 		return nil, fmt.Errorf("Failed getting iinc offset: %s", e)
@@ -1925,12 +1931,12 @@ func parseIincInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type i2lInstruction struct{ knownJVMInstruction }
+type i2lInstruction struct{ knownInstruction }
 
 func parseI2lInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := i2lInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x85,
 			name: name,
 		},
@@ -1938,12 +1944,12 @@ func parseI2lInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type i2fInstruction struct{ knownJVMInstruction }
+type i2fInstruction struct{ knownInstruction }
 
 func parseI2fInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := i2fInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x86,
 			name: name,
 		},
@@ -1951,12 +1957,12 @@ func parseI2fInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type i2dInstruction struct{ knownJVMInstruction }
+type i2dInstruction struct{ knownInstruction }
 
 func parseI2dInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := i2dInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x87,
 			name: name,
 		},
@@ -1964,12 +1970,12 @@ func parseI2dInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type l2iInstruction struct{ knownJVMInstruction }
+type l2iInstruction struct{ knownInstruction }
 
 func parseL2iInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := l2iInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x88,
 			name: name,
 		},
@@ -1977,12 +1983,12 @@ func parseL2iInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type l2fInstruction struct{ knownJVMInstruction }
+type l2fInstruction struct{ knownInstruction }
 
 func parseL2fInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := l2fInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x89,
 			name: name,
 		},
@@ -1990,12 +1996,12 @@ func parseL2fInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type l2dInstruction struct{ knownJVMInstruction }
+type l2dInstruction struct{ knownInstruction }
 
 func parseL2dInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := l2dInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x8a,
 			name: name,
 		},
@@ -2003,12 +2009,12 @@ func parseL2dInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type f2iInstruction struct{ knownJVMInstruction }
+type f2iInstruction struct{ knownInstruction }
 
 func parseF2iInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := f2iInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x8b,
 			name: name,
 		},
@@ -2016,12 +2022,12 @@ func parseF2iInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type f2lInstruction struct{ knownJVMInstruction }
+type f2lInstruction struct{ knownInstruction }
 
 func parseF2lInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := f2lInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x8c,
 			name: name,
 		},
@@ -2029,12 +2035,12 @@ func parseF2lInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type f2dInstruction struct{ knownJVMInstruction }
+type f2dInstruction struct{ knownInstruction }
 
 func parseF2dInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := f2dInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x8d,
 			name: name,
 		},
@@ -2042,12 +2048,12 @@ func parseF2dInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type d2iInstruction struct{ knownJVMInstruction }
+type d2iInstruction struct{ knownInstruction }
 
 func parseD2iInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := d2iInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x8e,
 			name: name,
 		},
@@ -2055,12 +2061,12 @@ func parseD2iInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type d2lInstruction struct{ knownJVMInstruction }
+type d2lInstruction struct{ knownInstruction }
 
 func parseD2lInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := d2lInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x8f,
 			name: name,
 		},
@@ -2068,12 +2074,12 @@ func parseD2lInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type d2fInstruction struct{ knownJVMInstruction }
+type d2fInstruction struct{ knownInstruction }
 
 func parseD2fInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := d2fInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x90,
 			name: name,
 		},
@@ -2081,12 +2087,12 @@ func parseD2fInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type i2bInstruction struct{ knownJVMInstruction }
+type i2bInstruction struct{ knownInstruction }
 
 func parseI2bInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := i2bInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x91,
 			name: name,
 		},
@@ -2094,12 +2100,12 @@ func parseI2bInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type i2cInstruction struct{ knownJVMInstruction }
+type i2cInstruction struct{ knownInstruction }
 
 func parseI2cInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := i2cInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x92,
 			name: name,
 		},
@@ -2107,12 +2113,12 @@ func parseI2cInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type i2sInstruction struct{ knownJVMInstruction }
+type i2sInstruction struct{ knownInstruction }
 
 func parseI2sInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := i2sInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x93,
 			name: name,
 		},
@@ -2120,12 +2126,12 @@ func parseI2sInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lcmpInstruction struct{ knownJVMInstruction }
+type lcmpInstruction struct{ knownInstruction }
 
 func parseLcmpInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lcmpInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x94,
 			name: name,
 		},
@@ -2133,12 +2139,12 @@ func parseLcmpInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fcmplInstruction struct{ knownJVMInstruction }
+type fcmplInstruction struct{ knownInstruction }
 
 func parseFcmplInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fcmplInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x95,
 			name: name,
 		},
@@ -2146,12 +2152,12 @@ func parseFcmplInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type fcmpgInstruction struct{ knownJVMInstruction }
+type fcmpgInstruction struct{ knownInstruction }
 
 func parseFcmpgInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := fcmpgInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x96,
 			name: name,
 		},
@@ -2159,12 +2165,12 @@ func parseFcmpgInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dcmplInstruction struct{ knownJVMInstruction }
+type dcmplInstruction struct{ knownInstruction }
 
 func parseDcmplInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dcmplInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x97,
 			name: name,
 		},
@@ -2172,12 +2178,12 @@ func parseDcmplInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dcmpgInstruction struct{ knownJVMInstruction }
+type dcmpgInstruction struct{ knownInstruction }
 
 func parseDcmpgInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dcmpgInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0x98,
 			name: name,
 		},
@@ -2188,7 +2194,7 @@ func parseDcmpgInstruction(opcode uint8, name string, address uint,
 type ifeqInstruction struct{ twoByteArgumentInstruction }
 
 func parseIfeqInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2199,7 +2205,7 @@ func parseIfeqInstruction(opcode uint8, name string, address uint,
 type ifneInstruction struct{ twoByteArgumentInstruction }
 
 func parseIfneInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2210,7 +2216,7 @@ func parseIfneInstruction(opcode uint8, name string, address uint,
 type ifltInstruction struct{ twoByteArgumentInstruction }
 
 func parseIfltInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2221,7 +2227,7 @@ func parseIfltInstruction(opcode uint8, name string, address uint,
 type ifgeInstruction struct{ twoByteArgumentInstruction }
 
 func parseIfgeInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2232,7 +2238,7 @@ func parseIfgeInstruction(opcode uint8, name string, address uint,
 type ifgtInstruction struct{ twoByteArgumentInstruction }
 
 func parseIfgtInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2243,7 +2249,7 @@ func parseIfgtInstruction(opcode uint8, name string, address uint,
 type ifleInstruction struct{ twoByteArgumentInstruction }
 
 func parseIfleInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2254,7 +2260,7 @@ func parseIfleInstruction(opcode uint8, name string, address uint,
 type if_icmpeqInstruction struct{ twoByteArgumentInstruction }
 
 func parseIf_icmpeqInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2265,7 +2271,7 @@ func parseIf_icmpeqInstruction(opcode uint8, name string, address uint,
 type if_icmpneInstruction struct{ twoByteArgumentInstruction }
 
 func parseIf_icmpneInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2276,7 +2282,7 @@ func parseIf_icmpneInstruction(opcode uint8, name string, address uint,
 type if_icmpltInstruction struct{ twoByteArgumentInstruction }
 
 func parseIf_icmpltInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2287,7 +2293,7 @@ func parseIf_icmpltInstruction(opcode uint8, name string, address uint,
 type if_icmpgeInstruction struct{ twoByteArgumentInstruction }
 
 func parseIf_icmpgeInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2298,7 +2304,7 @@ func parseIf_icmpgeInstruction(opcode uint8, name string, address uint,
 type if_icmpgtInstruction struct{ twoByteArgumentInstruction }
 
 func parseIf_icmpgtInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2309,7 +2315,7 @@ func parseIf_icmpgtInstruction(opcode uint8, name string, address uint,
 type if_icmpleInstruction struct{ twoByteArgumentInstruction }
 
 func parseIf_icmpleInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2320,7 +2326,7 @@ func parseIf_icmpleInstruction(opcode uint8, name string, address uint,
 type if_acmpeqInstruction struct{ twoByteArgumentInstruction }
 
 func parseIf_acmpeqInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2331,7 +2337,7 @@ func parseIf_acmpeqInstruction(opcode uint8, name string, address uint,
 type if_acmpneInstruction struct{ twoByteArgumentInstruction }
 
 func parseIf_acmpneInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2342,7 +2348,7 @@ func parseIf_acmpneInstruction(opcode uint8, name string, address uint,
 type gotoInstruction struct{ twoByteArgumentInstruction }
 
 func parseGotoInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2353,7 +2359,7 @@ func parseGotoInstruction(opcode uint8, name string, address uint,
 type jsrInstruction struct{ twoByteArgumentInstruction }
 
 func parseJsrInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2364,7 +2370,7 @@ func parseJsrInstruction(opcode uint8, name string, address uint,
 type retInstruction struct{ singleByteArgumentInstruction }
 
 func parseRetInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2394,6 +2400,10 @@ func (n *tableswitchInstruction) Length() uint {
 	// This is called by OtherBytes() to allocate a buffer, so it must not
 	// depend on OtherBytes().
 	return uint(n.skippedCount) + uint(len(n.offsets)*4) + 13
+}
+
+func (n *tableswitchInstruction) Optimize(m *Method, offset uint) error {
+	return nil
 }
 
 func (n *tableswitchInstruction) OtherBytes() []byte {
@@ -2428,7 +2438,7 @@ func (n *tableswitchInstruction) String() string {
 }
 
 func parseTableswitchInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	var e error
 	var toReturn tableswitchInstruction
 	currentOffset := address + 1
@@ -2487,6 +2497,10 @@ func (n *lookupswitchInstruction) Length() uint {
 	return uint(len(n.skippedBytes)) + uint(len(n.pairs)*8) + 9
 }
 
+func (n *lookupswitchInstruction) Optimize(m *Method, offset uint) error {
+	return nil
+}
+
 func (n *lookupswitchInstruction) OtherBytes() []byte {
 	toReturn := make([]byte, n.Length())
 	offset := 0
@@ -2516,7 +2530,7 @@ func (n *lookupswitchInstruction) String() string {
 }
 
 func parseLookupswitchInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	var e error
 	var toReturn lookupswitchInstruction
 	currentOffset := address + 1
@@ -2577,12 +2591,12 @@ func parseLookupswitchInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type ireturnInstruction struct{ knownJVMInstruction }
+type ireturnInstruction struct{ knownInstruction }
 
 func parseIreturnInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := ireturnInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0xac,
 			name: name,
 		},
@@ -2590,12 +2604,12 @@ func parseIreturnInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type lreturnInstruction struct{ knownJVMInstruction }
+type lreturnInstruction struct{ knownInstruction }
 
 func parseLreturnInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := lreturnInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0xad,
 			name: name,
 		},
@@ -2603,12 +2617,12 @@ func parseLreturnInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type freturnInstruction struct{ knownJVMInstruction }
+type freturnInstruction struct{ knownInstruction }
 
 func parseFreturnInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := freturnInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0xae,
 			name: name,
 		},
@@ -2616,12 +2630,12 @@ func parseFreturnInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type dreturnInstruction struct{ knownJVMInstruction }
+type dreturnInstruction struct{ knownInstruction }
 
 func parseDreturnInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := dreturnInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0xaf,
 			name: name,
 		},
@@ -2629,12 +2643,12 @@ func parseDreturnInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type areturnInstruction struct{ knownJVMInstruction }
+type areturnInstruction struct{ knownInstruction }
 
 func parseAreturnInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := areturnInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0xb0,
 			name: name,
 		},
@@ -2642,12 +2656,12 @@ func parseAreturnInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type returnInstruction struct{ knownJVMInstruction }
+type returnInstruction struct{ knownInstruction }
 
 func parseReturnInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := returnInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0xb1,
 			name: name,
 		},
@@ -2658,7 +2672,7 @@ func parseReturnInstruction(opcode uint8, name string, address uint,
 type getstaticInstruction struct{ twoByteArgumentInstruction }
 
 func parseGetstaticInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2669,7 +2683,7 @@ func parseGetstaticInstruction(opcode uint8, name string, address uint,
 type putstaticInstruction struct{ twoByteArgumentInstruction }
 
 func parsePutstaticInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2680,7 +2694,7 @@ func parsePutstaticInstruction(opcode uint8, name string, address uint,
 type getfieldInstruction struct{ twoByteArgumentInstruction }
 
 func parseGetfieldInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2691,7 +2705,7 @@ func parseGetfieldInstruction(opcode uint8, name string, address uint,
 type putfieldInstruction struct{ twoByteArgumentInstruction }
 
 func parsePutfieldInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2702,7 +2716,7 @@ func parsePutfieldInstruction(opcode uint8, name string, address uint,
 type invokevirtualInstruction struct{ twoByteArgumentInstruction }
 
 func parseInvokevirtualInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2713,7 +2727,7 @@ func parseInvokevirtualInstruction(opcode uint8, name string, address uint,
 type invokespecialInstruction struct{ twoByteArgumentInstruction }
 
 func parseInvokespecialInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2724,7 +2738,7 @@ func parseInvokespecialInstruction(opcode uint8, name string, address uint,
 type invokestaticInstruction struct{ twoByteArgumentInstruction }
 
 func parseInvokestaticInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2750,7 +2764,7 @@ func (n *invokeinterfaceInstruction) Length() uint {
 }
 
 func parseInvokeinterfaceInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	tmp, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2781,7 +2795,7 @@ func (n *invokedynamicInstruction) Length() uint {
 }
 
 func parseInvokedynamicInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2792,7 +2806,7 @@ func parseInvokedynamicInstruction(opcode uint8, name string, address uint,
 type newInstruction struct{ twoByteArgumentInstruction }
 
 func parseNewInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2803,7 +2817,7 @@ func parseNewInstruction(opcode uint8, name string, address uint,
 type newarrayInstruction struct{ singleByteArgumentInstruction }
 
 func parseNewarrayInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseSingleByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2814,7 +2828,7 @@ func parseNewarrayInstruction(opcode uint8, name string, address uint,
 type anewarrayInstruction struct{ twoByteArgumentInstruction }
 
 func parseAnewarrayInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2822,12 +2836,12 @@ func parseAnewarrayInstruction(opcode uint8, name string, address uint,
 	return &anewarrayInstruction{*toReturn}, nil
 }
 
-type arraylengthInstruction struct{ knownJVMInstruction }
+type arraylengthInstruction struct{ knownInstruction }
 
 func parseArraylengthInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := arraylengthInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0xbe,
 			name: name,
 		},
@@ -2835,12 +2849,12 @@ func parseArraylengthInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type athrowInstruction struct{ knownJVMInstruction }
+type athrowInstruction struct{ knownInstruction }
 
 func parseAthrowInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := athrowInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0xbf,
 			name: name,
 		},
@@ -2851,7 +2865,7 @@ func parseAthrowInstruction(opcode uint8, name string, address uint,
 type checkcastInstruction struct{ twoByteArgumentInstruction }
 
 func parseCheckcastInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2862,7 +2876,7 @@ func parseCheckcastInstruction(opcode uint8, name string, address uint,
 type instanceofInstruction struct{ twoByteArgumentInstruction }
 
 func parseInstanceofInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -2870,12 +2884,12 @@ func parseInstanceofInstruction(opcode uint8, name string, address uint,
 	return &instanceofInstruction{*toReturn}, nil
 }
 
-type monitorenterInstruction struct{ knownJVMInstruction }
+type monitorenterInstruction struct{ knownInstruction }
 
 func parseMonitorenterInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := monitorenterInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0xc2,
 			name: name,
 		},
@@ -2883,12 +2897,12 @@ func parseMonitorenterInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type monitorexitInstruction struct{ knownJVMInstruction }
+type monitorexitInstruction struct{ knownInstruction }
 
 func parseMonitorexitInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := monitorexitInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0xc3,
 			name: name,
 		},
@@ -2915,6 +2929,10 @@ func (n *wideInstruction) OtherBytes() []byte {
 
 func (n *wideInstruction) Length() uint {
 	return 4
+}
+
+func (n *wideInstruction) Optimize(m *Method, offset uint) error {
+	return nil
 }
 
 func (n *wideInstruction) String() string {
@@ -2948,14 +2966,18 @@ func (n *wideIincInstruction) Length() uint {
 	return 6
 }
 
+func (n *wideIincInstruction) Optimize(m *Method, offset uint) error {
+	return nil
+}
+
 func (n *wideIincInstruction) String() string {
 	return fmt.Sprintf("wide iinc 0x%04x 0x%04x", n.index, n.value)
 }
 
 // This only parses "wide iinc ..." instructions, and will be called by
 // parseWideInstruction
-func parseWideIincInstruction(address uint, m JVMMemory) (
-	JVMInstruction, error) {
+func parseWideIincInstruction(address uint, m Memory) (
+	Instruction, error) {
 	index, e := Read16Bits(m, address+2)
 	if e != nil {
 		return nil, fmt.Errorf("Couldn't read index for wide iinc: %s", e)
@@ -2972,7 +2994,7 @@ func parseWideIincInstruction(address uint, m JVMMemory) (
 }
 
 func parseWideInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	opcode, e := m.GetByte(address + 1)
 	if e != nil {
 		return nil, fmt.Errorf("Couldn't get wide instruction opcode: %s", e)
@@ -3022,12 +3044,16 @@ func (n *multianewarrayInstruction) Length() uint {
 	return 4
 }
 
+func (n *multianewarrayInstruction) Optimize(m *Method, offset uint) error {
+	return nil
+}
+
 func (n *multianewarrayInstruction) String() string {
 	return fmt.Sprintf("multianewarray 0x%04x %d", n.typeIndex, n.dimensions)
 }
 
 func parseMultianewarrayInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	typeIndex, e := Read16Bits(m, address+1)
 	if e != nil {
 		return nil, fmt.Errorf("Couldn't get multianewarray type index: %s", e)
@@ -3046,7 +3072,7 @@ func parseMultianewarrayInstruction(opcode uint8, name string, address uint,
 type ifnullInstruction struct{ twoByteArgumentInstruction }
 
 func parseIfnullInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -3057,7 +3083,7 @@ func parseIfnullInstruction(opcode uint8, name string, address uint,
 type ifnonnullInstruction struct{ twoByteArgumentInstruction }
 
 func parseIfnonnullInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -3086,12 +3112,16 @@ func (n *fourByteArgumentInstruction) Length() uint {
 	return 5
 }
 
+func (n *fourByteArgumentInstruction) Optimize(m *Method, offset uint) error {
+	return nil
+}
+
 func (n *fourByteArgumentInstruction) String() string {
 	return fmt.Sprintf("%s 0x%08x", n.name, n.value)
 }
 
 func parseFourByteArgumentInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (*fourByteArgumentInstruction, error) {
+	m Memory) (*fourByteArgumentInstruction, error) {
 	value, e := Read32Bits(m, address+1)
 	if e != nil {
 		return nil, fmt.Errorf("Couldn't read argument for %s: %s", name, e)
@@ -3107,7 +3137,7 @@ func parseFourByteArgumentInstruction(opcode uint8, name string, address uint,
 type goto_wInstruction struct{ fourByteArgumentInstruction }
 
 func parseGoto_wInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseFourByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -3118,7 +3148,7 @@ func parseGoto_wInstruction(opcode uint8, name string, address uint,
 type jsr_wInstruction struct{ fourByteArgumentInstruction }
 
 func parseJsr_wInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn, e := parseFourByteArgumentInstruction(opcode, name, address, m)
 	if e != nil {
 		return nil, e
@@ -3126,12 +3156,12 @@ func parseJsr_wInstruction(opcode uint8, name string, address uint,
 	return &jsr_wInstruction{*toReturn}, nil
 }
 
-type breakpointInstruction struct{ knownJVMInstruction }
+type breakpointInstruction struct{ knownInstruction }
 
 func parseBreakpointInstruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := breakpointInstruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0xca,
 			name: name,
 		},
@@ -3139,12 +3169,12 @@ func parseBreakpointInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type impdep1Instruction struct{ knownJVMInstruction }
+type impdep1Instruction struct{ knownInstruction }
 
 func parseImpdep1Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := impdep1Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0xfe,
 			name: name,
 		},
@@ -3152,12 +3182,12 @@ func parseImpdep1Instruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type impdep2Instruction struct{ knownJVMInstruction }
+type impdep2Instruction struct{ knownInstruction }
 
 func parseImpdep2Instruction(opcode uint8, name string, address uint,
-	m JVMMemory) (JVMInstruction, error) {
+	m Memory) (Instruction, error) {
 	toReturn := impdep2Instruction{
-		knownJVMInstruction: knownJVMInstruction{
+		knownInstruction: knownInstruction{
 			raw:  0xff,
 			name: name,
 		},

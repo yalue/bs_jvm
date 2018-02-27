@@ -1,12 +1,11 @@
 package jvm
 
 // This file contains a list of JVM opcode bytes and metadata needed for
-// parsing them into JVMInstruction-compatible types.
+// parsing them into Instruction-compatible types.
 
 // Takes an opcode, the instruction name, the address of the opcode, and a
-// JVMMemory, then returns a JVMInstruction object.
-type parserFunction func(uint8, string, uint, JVMMemory) (JVMInstruction,
-	error)
+// Memory, then returns an Instruction object.
+type parserFunction func(uint8, string, uint, Memory) (Instruction,	error)
 
 // Metadata to assist in parsing opcodes
 type jvmOpcodeInfo struct {

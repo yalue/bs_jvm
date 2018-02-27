@@ -78,7 +78,7 @@ func (c *emptyConstant) String() string {
 // Represents a class or interface
 type ConstantClassInfo struct {
 	// The index of a UTF-8 constant containing the class name
-	ClassNameIndex uint16
+	NameIndex uint16
 }
 
 func (n *ConstantClassInfo) Tag() ConstantTag {
@@ -86,7 +86,7 @@ func (n *ConstantClassInfo) Tag() ConstantTag {
 }
 
 func (n *ConstantClassInfo) String() string {
-	return fmt.Sprintf("%s, name index %d", n.Tag(), n.ClassNameIndex)
+	return fmt.Sprintf("%s, name index %d", n.Tag(), n.NameIndex)
 }
 
 // Contains information about a field in the class
