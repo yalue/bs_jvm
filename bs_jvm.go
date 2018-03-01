@@ -1,4 +1,6 @@
-// This package defines a JVM library for executing class and JAR files.
+// BS-JVM: The Blinding Speed JVM.
+//
+// A JVM library for the Go programming language.
 package bs_jvm
 
 import (
@@ -39,7 +41,7 @@ func (t *Thread) Run() error {
 	go func() {
 		var e error
 		var n Instruction
-		for e != nil {
+		for e == nil {
 			if t.ThreadExitReason != nil {
 				t.ThreadExitReason = e
 				t.threadComplete <- t.ThreadExitReason
@@ -357,6 +359,10 @@ func (j *JVM) StartMainClass(classFileName string) error {
 	className, e := classFile.GetName()
 	if e != nil {
 		return fmt.Errorf("Failed getting class name: %s\n", e)
+	}
+	e = j.LoadClass(classFile)
+	if e != nil {
+		return e
 	}
 	e = j.StartThread(string(className), "main")
 	return e

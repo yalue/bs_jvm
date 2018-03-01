@@ -5,8 +5,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/yalue/jvm"
-	"github.com/yalue/jvm/class_file"
+	"github.com/yalue/bs_jvm"
+	"github.com/yalue/bs_jvm/class_file"
 	"os"
 )
 
@@ -28,11 +28,11 @@ func (m methodCode) SetByte(value uint8, address uint) error {
 // Prints the disassembly for a method's code.
 func printDisassembly(codeBytes []byte) error {
 	var e error
-	var instruction jvm.Instruction
+	var instruction bs_jvm.Instruction
 	code := methodCode(codeBytes)
 	address := uint(0)
 	for address < uint(len(code)) {
-		instruction, e = jvm.GetNextInstruction(code, address)
+		instruction, e = bs_jvm.GetNextInstruction(code, address)
 		if e != nil {
 			return fmt.Errorf("Failed reading instruction at offset %d: %s",
 				address, e)
@@ -58,7 +58,7 @@ func run() int {
 		return 1
 	}
 	defer file.Close()
-	class, e := class_file.ParseClassFile(file)
+	class, e := class_file.ParseClass(file)
 	if e != nil {
 		fmt.Printf("Error parsing class file: %s\n", e)
 		return 1
