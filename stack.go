@@ -6,48 +6,99 @@ import (
 	"math"
 )
 
+// Holds everything necessary to restore a previous method's frame and return
+// address.
+type MethodFrame struct {
+	Method         *Method
+	ReturnIndex    uint
+	ReferenceFrame int
+	DataFrame      int
+}
+
 // An interface for a function call stack. A thread can keep this separate from
 // its data stack.
 type CallStack interface {
 	// Used to push a return method and instruction index onto the call stack.
-	Push(method *Method, returnIndex uint) error
+	Push(f MethodFrame) error
 	// Used to pop a return method and instruction index from the stack.
-	Pop() (*Method, uint, error)
+	Pop() (MethodFrame, error)
 }
 
 // Implements the CallStack interface.
 type basicCallStack struct {
-	methods       []*Method
-	returnIndices []uint
+	frames []MethodFrame
 }
 
 // Returns a new CallStack instance, that can hold up to the given number of
-// return addresses.
+// return locations.
 func NewCallStack(capacity uint32) CallStack {
 	return &basicCallStack{
-		methods:       make([]*Method, 0, capacity),
-		returnIndices: make([]uint, 0, capacity),
+		frames: make([]MethodFrame, 0, capacity),
 	}
 }
 
-func (s *basicCallStack) Push(method *Method, returnIndex uint) error {
-	if len(s.methods) >= cap(s.methods) {
+func (s *basicCallStack) Push(f MethodFrame) error {
+	if len(s.frames) >= cap(s.frames) {
 		return StackOverflowError
 	}
-	s.methods = append(s.methods, method)
-	s.returnIndices = append(s.returnIndices, returnIndex)
+	s.frames = append(s.frames, f)
 	return nil
 }
 
-func (s *basicCallStack) Pop() (*Method, uint, error) {
-	if len(s.methods) == 0 {
-		return nil, 0, StackEmptyError
+func (s *basicCallStack) Pop() (MethodFrame, error) {
+	if len(s.frames) == 0 {
+		return MethodFrame{}, StackEmptyError
 	}
-	method := s.methods[len(s.methods)-1]
-	returnIndex := s.returnIndices[len(s.returnIndices)-1]
-	s.methods = s.methods[0 : len(s.methods)-1]
-	s.returnIndices = s.returnIndices[0 : len(s.returnIndices)-1]
-	return method, returnIndex, nil
+	toReturn := s.frames[len(s.frames)-1]
+	s.frames = s.frames[0 : len(s.frames)-1]
+	return toReturn, nil
+}
+
+// An interface for a thread's stack of references. This can be separate from
+// the data stack just for the sake of type checking.
+type ReferenceStack interface {
+	Push(r Reference) error
+	Pop() (Reference, error)
+	// Returns the current stack top indicator, which can be restored later.
+	GetFrame() int
+	// Sets the top of the stack, used to restore a method frame. This can
+	// only be used to reduce the current stack contents, otherwise returns an
+	// error.
+	SetFrame(n int) error
+}
+
+// Implements the ReferenceStack interface.
+type basicReferenceStack struct {
+	references []Reference
+}
+
+func (s *basicReferenceStack) Push(r Reference) error {
+	if len(s.references) >= cap(s.references) {
+		return StackOverflowError
+	}
+	s.references = append(s.references, r)
+	return nil
+}
+
+func (s *basicReferenceStack) Pop() (Reference, error) {
+	if len(s.references) == 0 {
+		return nil, StackEmptyError
+	}
+	toReturn := s.references[len(s.references)-1]
+	s.references = s.references[0 : len(s.references)-1]
+	return toReturn, nil
+}
+
+func (s *basicReferenceStack) GetFrame() int {
+	return len(s.references)
+}
+
+func (s *basicReferenceStack) SetFrame(n int) error {
+	if (n < 0) || (n > len(s.references)) {
+		return BadFrameError(n)
+	}
+	s.references = s.references[0:n]
+	return nil
 }
 
 // An interface for a thread's data stack. Returns an error if a stack overflow
@@ -61,11 +112,29 @@ type DataStack interface {
 	PopFloat() (float32, error)
 	PushDouble(v float64) error
 	PopDouble() (float64, error)
+	// Returns the current stack top indicator, which can be restored later.
+	GetFrame() int
+	// Sets the top of the stack, used to restore a method frame. This can
+	// only be used to reduce the current stack contents, otherwise returns an
+	// error.
+	SetFrame(n int) error
 }
 
 // Implements the stack interface.
 type basicDataStack struct {
 	data []int32
+}
+
+func (s *basicDataStack) GetFrame() int {
+	return len(s.data)
+}
+
+func (s *basicDataStack) SetFrame(n int) error {
+	if (n <= 0) || (n > len(s.data)) {
+		return BadFrameError(n)
+	}
+	s.data = s.data[0:n]
+	return nil
 }
 
 func (s *basicDataStack) Push(v int32) error {

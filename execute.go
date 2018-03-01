@@ -3,78 +3,79 @@ package bs_jvm
 // This file contains functions for executing individual JVM instructions.
 
 func (n *nopInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return nil
 }
 
 func (n *aconst_nullInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.References.Push(nil)
 }
 
 func (n *iconst_m1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.Push(-1)
 }
 
 func (n *iconst_0Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.Push(0)
 }
 
 func (n *iconst_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.Push(1)
 }
 
 func (n *iconst_2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.Push(2)
 }
 
 func (n *iconst_3Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.Push(3)
 }
 
 func (n *iconst_4Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.Push(4)
 }
 
 func (n *iconst_5Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.Push(5)
 }
 
 func (n *lconst_0Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.PushLong(0)
 }
 
 func (n *lconst_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.PushLong(1)
 }
 
 func (n *fconst_0Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.PushFloat(0.0)
 }
 
 func (n *fconst_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.PushFloat(1.0)
 }
 
 func (n *fconst_2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.PushFloat(2.0)
 }
 
 func (n *dconst_0Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.PushDouble(0.0)
 }
 
 func (n *dconst_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.PushDouble(1.0)
 }
 
 func (n *bipushInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.Push(int32(int8(n.value)))
 }
 
 func (n *sipushInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.Push(int32(int16(n.value)))
 }
 
 func (n *ldcInstruction) Execute(t *Thread) error {
+	// TODO: Implement ldc
 	return NotImplementedError
 }
 

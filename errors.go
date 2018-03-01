@@ -51,3 +51,10 @@ func (e MethodNotFoundError) Error() string {
 // This will be returned when a thread exits, either explicity or by allowing
 // its initial method to return. It should not usually indicate a problem.
 var ThreadExitedError = fmt.Errorf("Thread exited")
+
+// This is returned when attempting to set an invalid stack frame.
+type BadFrameError int
+
+func (e BadFrameError) Error() string {
+	return fmt.Sprintf("Invalid stack frame indicator: %d", int(e))
+}
