@@ -1,4 +1,4 @@
-package jvm
+package bs_jvm
 
 // This file contains functions and types related to JVM memory management.
 

@@ -1,12 +1,12 @@
-package jvm
+package bs_jvm
 
 import (
-	"github.com/yalue/jvm/class_file"
+	"github.com/yalue/bs_jvm/class_file"
 	"os"
 	"testing"
 )
 
-func getTestClass(t *testing.T) *class_file.Class {
+func getTestClassFile(t *testing.T) *class_file.Class {
 	file, e := os.Open("class_file/test_data/RandomDots.class")
 	if e != nil {
 		t.Logf("Failed opening the test class file: %s\n", e)
@@ -45,7 +45,7 @@ func getRandomDotMethodCode(t *testing.T, class *class_file.Class) []byte {
 
 func TestGetNextInstruction(t *testing.T) {
 	var e error
-	class := getTestClass(t)
+	class := getTestClassFile(t)
 	codeBytes := getRandomDotMethodCode(t, class)
 	codeMemory := MemoryFromSlice(codeBytes)
 	var instruction Instruction

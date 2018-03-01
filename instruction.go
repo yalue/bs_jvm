@@ -1,4 +1,4 @@
-package jvm
+package bs_jvm
 
 // This file contains functions for disassembling JVM instructions.
 
@@ -14,14 +14,13 @@ type Instruction interface {
 	// nil if the instruction doesn't have such bytes. May be slow for some
 	// opcodes.
 	OtherBytes() []byte
-	// This takes a reference to the current pre-parsed method, and the
-	// instruction's offset (in bytes) into the method code. This may be called
-	// during an optimization pass before execution. It should be treated as
-	// optional, so Execute(..) should function regardless of whether this has
-	// been called.
-	Optimize(m *Method, offset uint) error
+	// This takes a reference to the current pre-parsed method, the
+	// instruction's offset (in bytes) into the method code, and a map of
+	// instruction offsets to instruction indices. This must be called during
+	// an optimization pass before execution.
+	Optimize(m *Method, offset uint, instructionIndices map[uint]int) error
 	// Runs the instruction in the given thread
-	Execute(t Thread) error
+	Execute(t *Thread) error
 	// Returns the length of the instruction, including the opcode and
 	// additional argument bytes.
 	Length() uint
@@ -46,11 +45,12 @@ func (n *unknownInstruction) Length() uint {
 	return 1
 }
 
-func (n *unknownInstruction) Optimize(m *Method, offset uint) error {
+func (n *unknownInstruction) Optimize(m *Method, offset uint,
+	instructionIndices map[uint]int) error {
 	return nil
 }
 
-func (n *unknownInstruction) Execute(t Thread) error {
+func (n *unknownInstruction) Execute(t *Thread) error {
 	return UnknownInstructionError(n.raw)
 }
 
@@ -77,11 +77,12 @@ func (n *knownInstruction) Length() uint {
 	return 1
 }
 
-func (n *knownInstruction) Optimize(m *Method, offset uint) error {
+func (n *knownInstruction) Optimize(m *Method, offset uint,
+	instructionIndices map[uint]int) error {
 	return nil
 }
 
-func (n *knownInstruction) Execute(t Thread) error {
+func (n *knownInstruction) Execute(t *Thread) error {
 	return fmt.Errorf("Execution not implemented for %s", n.String())
 }
 
@@ -358,7 +359,7 @@ func (n *singleByteArgumentInstruction) Length() uint {
 }
 
 func (n *singleByteArgumentInstruction) Optimize(m *Method,
-	offset uint) error {
+	offset uint, instructionIndices map[uint]int) error {
 	return nil
 }
 
@@ -398,7 +399,8 @@ func (n *twoByteArgumentInstruction) Length() uint {
 	return 3
 }
 
-func (n *twoByteArgumentInstruction) Optimize(m *Method, offset uint) error {
+func (n *twoByteArgumentInstruction) Optimize(m *Method, offset uint,
+	instructionIndices map[uint]int) error {
 	return nil
 }
 
@@ -1906,7 +1908,8 @@ func (n *iincInstruction) Length() uint {
 	return 3
 }
 
-func (n *iincInstruction) Optimize(m *Method, offset uint) error {
+func (n *iincInstruction) Optimize(m *Method, offset uint,
+	instructionIndices map[uint]int) error {
 	return nil
 }
 
@@ -2402,7 +2405,8 @@ func (n *tableswitchInstruction) Length() uint {
 	return uint(n.skippedCount) + uint(len(n.offsets)*4) + 13
 }
 
-func (n *tableswitchInstruction) Optimize(m *Method, offset uint) error {
+func (n *tableswitchInstruction) Optimize(m *Method, offset uint,
+	instructionIndices map[uint]int) error {
 	return nil
 }
 
@@ -2411,7 +2415,7 @@ func (n *tableswitchInstruction) OtherBytes() []byte {
 	offset := 0
 	// Use this inner function for convenience, and allowing us to avoid
 	// encoding/binary.
-	// TODO: Test this!!
+	// TODO: Test OtherBytes() for tableswitchInstruction
 	writeValueToBuffer := func(value uint32) {
 		toReturn[offset] = uint8(value >> 24)
 		toReturn[offset+1] = uint8(value >> 16)
@@ -2497,7 +2501,8 @@ func (n *lookupswitchInstruction) Length() uint {
 	return uint(len(n.skippedBytes)) + uint(len(n.pairs)*8) + 9
 }
 
-func (n *lookupswitchInstruction) Optimize(m *Method, offset uint) error {
+func (n *lookupswitchInstruction) Optimize(m *Method, offset uint,
+	instructionIndices map[uint]int) error {
 	return nil
 }
 
@@ -2931,7 +2936,8 @@ func (n *wideInstruction) Length() uint {
 	return 4
 }
 
-func (n *wideInstruction) Optimize(m *Method, offset uint) error {
+func (n *wideInstruction) Optimize(m *Method, offset uint,
+	instructionIndices map[uint]int) error {
 	return nil
 }
 
@@ -2966,7 +2972,8 @@ func (n *wideIincInstruction) Length() uint {
 	return 6
 }
 
-func (n *wideIincInstruction) Optimize(m *Method, offset uint) error {
+func (n *wideIincInstruction) Optimize(m *Method, offset uint,
+	instructionIndices map[uint]int) error {
 	return nil
 }
 
@@ -3044,7 +3051,8 @@ func (n *multianewarrayInstruction) Length() uint {
 	return 4
 }
 
-func (n *multianewarrayInstruction) Optimize(m *Method, offset uint) error {
+func (n *multianewarrayInstruction) Optimize(m *Method, offset uint,
+	instructionIndices map[uint]int) error {
 	return nil
 }
 
@@ -3112,7 +3120,8 @@ func (n *fourByteArgumentInstruction) Length() uint {
 	return 5
 }
 
-func (n *fourByteArgumentInstruction) Optimize(m *Method, offset uint) error {
+func (n *fourByteArgumentInstruction) Optimize(m *Method, offset uint,
+	instructionIndices map[uint]int) error {
 	return nil
 }
 

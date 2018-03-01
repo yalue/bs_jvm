@@ -1,4 +1,4 @@
-package jvm
+package bs_jvm
 
 // This file contains various error types used by various portions of the
 // library. They're all located in a single file for faster reference.
@@ -11,7 +11,7 @@ import (
 type UnknownInstructionError uint8
 
 func (e UnknownInstructionError) Error() string {
-	return fmt.Sprintf("Unknown/bad JVM opcode: 0x%02x", e)
+	return fmt.Sprintf("Unknown/bad JVM opcode: 0x%02x", uint8(e))
 }
 
 // This error is returned when a feature is invoked that has not yet been
@@ -25,3 +25,29 @@ type InvalidAddressError uint
 func (e InvalidAddressError) Error() string {
 	return fmt.Sprintf("Invalid address: 0x%x", uint(e))
 }
+
+// This is returned if a stack grows beyond its capacity.
+var StackOverflowError = fmt.Errorf("Stack overflow")
+
+// This is returned if an attempt to read from an empty stack occurs.
+var StackEmptyError = fmt.Errorf("Stack empty")
+
+// This is returned if a class lookup fails. Contains the class name that was
+// requested but not known.
+type ClassNotFoundError string
+
+func (e ClassNotFoundError) Error() string {
+	return fmt.Sprintf("Class not found: %s", string(e))
+}
+
+// This is returned if a method lookup fails. Consists of the name of the
+// requested method.
+type MethodNotFoundError string
+
+func (e MethodNotFoundError) Error() string {
+	return fmt.Sprintf("Method not found: %s", string(e))
+}
+
+// This will be returned when a thread exits, either explicity or by allowing
+// its initial method to return. It should not usually indicate a problem.
+var ThreadExitedError = fmt.Errorf("Thread exited")

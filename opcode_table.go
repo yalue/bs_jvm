@@ -1,4 +1,4 @@
-package jvm
+package bs_jvm
 
 // This file contains a list of JVM opcode bytes and metadata needed for
 // parsing them into Instruction-compatible types.

@@ -1,20 +1,16 @@
-Another Go-based JVM Implementation
-===================================
+BS-JVM
+======
 
 About
 -----
 
-This project aims to implement a function JVM in the Go programming language.
-I am aware that such a project exists already, so my own effort here is only
-for my personal benefit for now.
-
-The JVM is not actually implemented yet. All that has been completed is parsing
-class files and disassembly.
+The BS ("Blinding Speed") Java Virtual Machine is a work-in-progress JVM
+implementation in the Go programming language.
 
 Usage
 -----
 
-For now, only disassembly works. Usage:
+For now, only class file disassembly works. Usage:
 
 ```bash
 cd disassemble/
