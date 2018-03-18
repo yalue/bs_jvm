@@ -58,3 +58,11 @@ type BadFrameError int
 func (e BadFrameError) Error() string {
 	return fmt.Sprintf("Invalid stack frame indicator: %d", int(e))
 }
+
+// This is returned if an attempt to operate on invalid data is detected during
+// instruction execution or an optimization pass.
+type TypeError string
+
+func (e TypeError) Error() string {
+	return fmt.Sprintf("Type error: %s", string(e))
+}

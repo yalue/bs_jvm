@@ -6,42 +6,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/yalue/bs_jvm"
-	"github.com/yalue/bs_jvm/class_file"
 	"os"
 )
-
-// Define a type to trivially implement the jvm.JVMMemory interface
-type methodCode []byte
-
-func (m methodCode) GetByte(address uint) (uint8, error) {
-	if address >= uint(len(m)) {
-		return 0, fmt.Errorf("Can't read code offset %d in a %d-byte method",
-			address, len(m))
-	}
-	return m[address], nil
-}
-
-func (m methodCode) SetByte(value uint8, address uint) error {
-	return fmt.Errorf("Can't write to method code")
-}
-
-// Prints the disassembly for a method's code.
-func printDisassembly(codeBytes []byte) error {
-	var e error
-	var instruction bs_jvm.Instruction
-	code := methodCode(codeBytes)
-	address := uint(0)
-	for address < uint(len(code)) {
-		instruction, e = bs_jvm.GetNextInstruction(code, address)
-		if e != nil {
-			return fmt.Errorf("Failed reading instruction at offset %d: %s",
-				address, e)
-		}
-		fmt.Printf("  0x%08x: %s\n", address, instruction)
-		address += instruction.Length()
-	}
-	return nil
-}
 
 func run() int {
 	var filename string
@@ -52,31 +18,21 @@ func run() int {
 		fmt.Println("Invalid arguments. Run with -help for more information.")
 		return 1
 	}
-	file, e := os.Open(filename)
+	jvm := bs_jvm.NewJVM()
+	className, e := jvm.LoadClassFromFile(filename)
 	if e != nil {
-		fmt.Printf("Error opening class file: %s\n", e)
+		fmt.Printf("Failed loading class: %s\n", e)
 		return 1
 	}
-	defer file.Close()
-	class, e := class_file.ParseClass(file)
-	if e != nil {
-		fmt.Printf("Error parsing class file: %s\n", e)
-		return 1
-	}
-	fmt.Printf("Methods in %s:\n", filename)
-	var codeAttribute *class_file.CodeAttribute
-	// Display disassembly for each method.
-	for i, method := range class.Methods {
-		fmt.Printf("Method %d: %s\n", i, method)
-		codeAttribute, e = method.GetCodeAttribute(class)
-		if e != nil {
-			fmt.Printf("  Couldn't get code attribute: %s\n", e)
-			continue
-		}
-		e = printDisassembly(codeAttribute.Code)
-		if e != nil {
-			fmt.Printf("  Failed disassembling code: %s\n", e)
-			continue
+	var offset uint
+	fmt.Printf("Methods in class %s:\n", className)
+	class := jvm.Classes[className]
+	for name, method := range class.Methods {
+		offset = 0
+		fmt.Printf("  Method %s:\n", name)
+		for _, n := range method.Instructions {
+			fmt.Printf("    0x%08x %s\n", offset, n)
+			offset += n.Length()
 		}
 	}
 	return 0

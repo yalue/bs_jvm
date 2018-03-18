@@ -35,7 +35,7 @@ func TestStack(t *testing.T) {
 		t.FailNow()
 	}
 	v := uint64(0xf000133780001337)
-	e = s.PushLong(int64(v))
+	e = s.PushLong(Long(v))
 	if e != nil {
 		t.Logf("Failed pushing long: %s\n", e)
 		t.FailNow()

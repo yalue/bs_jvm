@@ -67,16 +67,18 @@ func (n *dconst_1Instruction) Execute(t *Thread) error {
 }
 
 func (n *bipushInstruction) Execute(t *Thread) error {
-	return t.Stack.Push(int32(int8(n.value)))
+	return t.Stack.Push(Int(int8(n.value)))
 }
 
 func (n *sipushInstruction) Execute(t *Thread) error {
-	return t.Stack.Push(int32(int16(n.value)))
+	return t.Stack.Push(Int(int16(n.value)))
 }
 
 func (n *ldcInstruction) Execute(t *Thread) error {
-	// TODO: Implement ldc
-	return NotImplementedError
+	if n.isPrimitive {
+		return t.Stack.Push(n.primitiveValue)
+	}
+	return t.References.Push(n.reference)
 }
 
 func (n *ldc_wInstruction) Execute(t *Thread) error {

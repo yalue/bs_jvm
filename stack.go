@@ -104,14 +104,14 @@ func (s *basicReferenceStack) SetFrame(n int) error {
 // An interface for a thread's data stack. Returns an error if a stack overflow
 // occurs, or if a stack is empty.
 type DataStack interface {
-	Push(v int32) error
-	Pop() (int32, error)
-	PushLong(v int64) error
-	PopLong() (int64, error)
-	PushFloat(v float32) error
-	PopFloat() (float32, error)
-	PushDouble(v float64) error
-	PopDouble() (float64, error)
+	Push(v Int) error
+	Pop() (Int, error)
+	PushLong(v Long) error
+	PopLong() (Long, error)
+	PushFloat(v Float) error
+	PopFloat() (Float, error)
+	PushDouble(v Double) error
+	PopDouble() (Double, error)
 	// Returns the current stack top indicator, which can be restored later.
 	GetFrame() int
 	// Sets the top of the stack, used to restore a method frame. This can
@@ -137,24 +137,24 @@ func (s *basicDataStack) SetFrame(n int) error {
 	return nil
 }
 
-func (s *basicDataStack) Push(v int32) error {
+func (s *basicDataStack) Push(v Int) error {
 	if len(s.data) >= cap(s.data) {
 		return StackOverflowError
 	}
-	s.data = append(s.data, v)
+	s.data = append(s.data, int32(v))
 	return nil
 }
 
-func (s *basicDataStack) Pop() (int32, error) {
+func (s *basicDataStack) Pop() (Int, error) {
 	if len(s.data) < 1 {
 		return 0, StackEmptyError
 	}
 	toReturn := s.data[len(s.data)-1]
 	s.data = s.data[0 : len(s.data)-1]
-	return toReturn, nil
+	return Int(toReturn), nil
 }
 
-func (s *basicDataStack) PushLong(v int64) error {
+func (s *basicDataStack) PushLong(v Long) error {
 	if (len(s.data) + 1) >= cap(s.data) {
 		return StackOverflowError
 	}
@@ -164,7 +164,7 @@ func (s *basicDataStack) PushLong(v int64) error {
 	return nil
 }
 
-func (s *basicDataStack) PopLong() (int64, error) {
+func (s *basicDataStack) PopLong() (Long, error) {
 	if len(s.data) < 2 {
 		return 0, StackEmptyError
 	}
@@ -172,31 +172,31 @@ func (s *basicDataStack) PopLong() (int64, error) {
 	lowBits := s.data[len(s.data)-2]
 	s.data = s.data[0 : len(s.data)-2]
 	// Cast low bits to an unsigned value to avoid sign extension.
-	return (int64(highBits) << 32) | int64(uint32(lowBits)), nil
+	return (Long(highBits) << 32) | Long(uint32(lowBits)), nil
 }
 
-func (s *basicDataStack) PushFloat(v float32) error {
-	return s.Push(int32(math.Float32bits(v)))
+func (s *basicDataStack) PushFloat(v Float) error {
+	return s.Push(Int(math.Float32bits(float32(v))))
 }
 
-func (s *basicDataStack) PopFloat() (float32, error) {
+func (s *basicDataStack) PopFloat() (Float, error) {
 	bits, e := s.Pop()
 	if e != nil {
 		return 0, e
 	}
-	return math.Float32frombits(uint32(bits)), nil
+	return Float(math.Float32frombits(uint32(bits))), nil
 }
 
-func (s *basicDataStack) PushDouble(v float64) error {
-	return s.PushLong(int64(math.Float64bits(v)))
+func (s *basicDataStack) PushDouble(v Double) error {
+	return s.PushLong(Long(math.Float64bits(float64(v))))
 }
 
-func (s *basicDataStack) PopDouble() (float64, error) {
+func (s *basicDataStack) PopDouble() (Double, error) {
 	bits, e := s.PopLong()
 	if e != nil {
 		return 0, e
 	}
-	return math.Float64frombits(uint64(bits)), nil
+	return Double(math.Float64frombits(uint64(bits))), nil
 }
 
 // Takes a capacity, in a number of 32-bit integers, and returns a new empty

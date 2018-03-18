@@ -434,7 +434,16 @@ func parseSipushInstruction(opcode uint8, name string, address uint,
 	return &sipushInstruction{*toReturn}, nil
 }
 
-type ldcInstruction struct{ singleByteArgumentInstruction }
+type ldcInstruction struct {
+	singleByteArgumentInstruction
+	// True if the LDC constant was an int or float.
+	isPrimitive bool
+	// This will contain the value to push, if isPrimitive was true. If the
+	// constant is a float, this will be the bits of the float.
+	primitiveValue Int
+	// This will be the reference to push, if isPrimitive was false.
+	reference Reference
+}
 
 func parseLdcInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -442,7 +451,19 @@ func parseLdcInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &ldcInstruction{*toReturn}, nil
+	return &ldcInstruction{singleByteArgumentInstruction: *toReturn}, nil
+}
+
+func (n *ldcInstruction) String() string {
+	if n.isPrimitive {
+		return fmt.Sprintf("ldc 0x%08x", int32(n.primitiveValue))
+	} else {
+		if n.reference == nil {
+			// This will be true if the instruction hasn't been optimized yet.
+			return fmt.Sprintf("ldc 0x%02x", n.value)
+		}
+		return fmt.Sprintf("ldc %s", n.reference)
+	}
 }
 
 type ldc_wInstruction struct{ twoByteArgumentInstruction }

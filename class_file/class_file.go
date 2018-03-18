@@ -108,19 +108,11 @@ func (c *Class) GetName() ([]byte, error) {
 		return nil, fmt.Errorf("Got incorrect info constant type (got %s)",
 			infoConstant.String())
 	}
-	nameConstant, e := c.GetConstant(classInfo.NameIndex)
-	if e != nil {
-		return nil, fmt.Errorf("Failed getting class name constant: %s", e)
-	}
-	name, ok := nameConstant.(*ConstantUTF8Info)
-	if !ok {
-		return nil, fmt.Errorf("Got incorrect name constant type (got %s)",
-			nameConstant.String())
-	}
-	return name.Bytes, nil
+	return c.GetUTF8Constant(classInfo.NameIndex)
 }
 
-// Parses a class file; returns an error if the file is not valid.
+// Parses a class file; returns an error if the file is not valid. The file can
+// be closed after this function returns.
 func ParseClass(data io.Reader) (*Class, error) {
 	var toReturn Class
 	var magic uint32

@@ -14,7 +14,7 @@ import (
 type Thread struct {
 	// The method that the thread is currently executing.
 	CurrentMethod *Method
-	// The containing JVM.
+	// A pointer to the JVM running this thread.
 	ParentJVM *JVM
 	// The index of the current instruction in the method.
 	InstructionIndex uint
@@ -164,8 +164,6 @@ func NewJVM() *JVM {
 
 // Holds a parsed JVM method.
 type Method struct {
-	// A reference to the parent JVM.
-	ParentJVM *JVM
 	// The class in which the method was defined.
 	ContainingClass *Class
 	// Contains all parsed functions in the method.
@@ -200,7 +198,6 @@ func (j *JVM) NewMethod(class *Class, index int) (*Method, error) {
 		address += instruction.Length()
 	}
 	toReturn := Method{
-		ParentJVM:       j,
 		ContainingClass: class,
 		Instructions:    make([]Instruction, instructionCount),
 	}
@@ -230,55 +227,13 @@ func (j *JVM) NewMethod(class *Class, index int) (*Method, error) {
 	return &toReturn, nil
 }
 
-// Holds a loaded JVM class.
-type Class struct {
-	Methods map[string]*Method
-	File    *class_file.Class
-}
-
-// Returns the named method from the class. Returns a MethodNotFoundError if
-// the method isn't found.
-func (c *Class) GetMethod(name string) (*Method, error) {
-	toReturn := c.Methods[name]
-	if toReturn == nil {
-		return nil, MethodNotFoundError(name)
-	}
-	return toReturn, nil
-}
-
-// Takes a class loaded by the class_file package and converts it to the Class
-// type needed by the JVM. Does *not* modify the state of the JVM.
-func (j *JVM) NewClass(class *class_file.Class) (*Class, error) {
-	toReturn := Class{
-		Methods: make(map[string]*Method),
-		File:    class,
-	}
-	var methodName []byte
-	var method *Method
-	var e error
-	for i := range class.Methods {
-		methodName = class.Methods[i].Name
-		method, e = j.NewMethod(&toReturn, i)
-		if e != nil {
-			return nil, fmt.Errorf("Failed loading method %s: %s", methodName,
-				e)
-		}
-		toReturn.Methods[string(methodName)] = method
-	}
-	return &toReturn, nil
-}
-
 // Adds the given class file to the JVM so that its code
 func (j *JVM) LoadClass(class *class_file.Class) error {
-	name, e := class.GetName()
+	loadedClass, e := NewClass(j, class)
 	if e != nil {
-		return fmt.Errorf("Failed getting class name: %s", e)
+		return fmt.Errorf("Error loading class: %s", e)
 	}
-	loadedClass, e := j.NewClass(class)
-	if e != nil {
-		return fmt.Errorf("Error loading class %s: %s", name, e)
-	}
-	j.Classes[string(name)] = loadedClass
+	j.Classes[string(loadedClass.Name)] = loadedClass
 	return nil
 }
 
@@ -364,25 +319,36 @@ func (j *JVM) WaitForAllThreads() error {
 	return toReturn
 }
 
-// Takes a path to a class file, parses and loads the class, then looks for the
-// main function in the class and starts executing it.
-func (j *JVM) StartMainClass(classFileName string) error {
+// A simple wrapper around LoadClass that takes a class filename instead of a
+// parsed file. Returns the name of the loaded class on success.
+func (j *JVM) LoadClassFromFile(classFileName string) (string, error) {
 	file, e := os.Open(classFileName)
 	if e != nil {
-		return fmt.Errorf("Failed opening class file: %s\n", e)
+		return "", fmt.Errorf("Failed opening class file: %s", e)
 	}
+	defer file.Close()
 	classFile, e := class_file.ParseClass(file)
 	if e != nil {
-		return e
+		return "", e
 	}
 	className, e := classFile.GetName()
 	if e != nil {
-		return fmt.Errorf("Failed getting class name: %s\n", e)
+		return "", fmt.Errorf("Failed getting class name: %s", e)
 	}
 	e = j.LoadClass(classFile)
 	if e != nil {
+		return "", e
+	}
+	return string(className), nil
+}
+
+// Takes a path to a class file, parses and loads the class, then looks for the
+// main function in the class and starts executing it.
+func (j *JVM) StartMainClass(classFileName string) error {
+	className, e := j.LoadClassFromFile(classFileName)
+	if e != nil {
 		return e
 	}
-	e = j.StartThread(string(className), "main")
+	e = j.StartThread(className, "main")
 	return e
 }
