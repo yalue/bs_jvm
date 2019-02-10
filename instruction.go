@@ -441,8 +441,10 @@ type ldcInstruction struct {
 	// This will contain the value to push, if isPrimitive was true. If the
 	// constant is a float, this will be the bits of the float.
 	primitiveValue Int
-	// This will be the reference to push, if isPrimitive was false.
-	reference Reference
+	// This will be the reference to push, if isPrimitive was false. If
+	// isPrimitive was true, this will still be set, but to the primitive
+	// reference.
+	reference Object
 }
 
 func parseLdcInstruction(opcode uint8, name string, address uint,
@@ -455,18 +457,20 @@ func parseLdcInstruction(opcode uint8, name string, address uint,
 }
 
 func (n *ldcInstruction) String() string {
-	if n.isPrimitive {
-		return fmt.Sprintf("ldc 0x%08x", int32(n.primitiveValue))
-	} else {
-		if n.reference == nil {
-			// This will be true if the instruction hasn't been optimized yet.
-			return fmt.Sprintf("ldc 0x%02x", n.value)
-		}
+	if n.reference != nil {
 		return fmt.Sprintf("ldc %s", n.reference)
 	}
+	// This will be the case if the instruction hasn't been optimized yet.
+	return fmt.Sprintf("ldc 0x%02x", n.value)
 }
 
-type ldc_wInstruction struct{ twoByteArgumentInstruction }
+type ldc_wInstruction struct {
+	twoByteArgumentInstruction
+	// All of these are the same as for ldcInstruction
+	isPrimitive    bool
+	primitiveValue Int
+	reference      Object
+}
 
 func parseLdc_wInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -474,10 +478,24 @@ func parseLdc_wInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &ldc_wInstruction{*toReturn}, nil
+	return &ldc_wInstruction{twoByteArgumentInstruction: *toReturn}, nil
 }
 
-type ldc2_wInstruction struct{ twoByteArgumentInstruction }
+func (n *ldc_wInstruction) String() string {
+	if n.reference != nil {
+		return fmt.Sprintf("ldc_w %s", n.reference)
+	}
+	return fmt.Sprintf("ldc_w 0x%04x", n.value)
+}
+
+type ldc2_wInstruction struct {
+	twoByteArgumentInstruction
+	// Once again, this will contain the bits of the double-precision number
+	primitiveValue Long
+	// This will be the primitive as an object, mostly so that a string can be
+	// formatted nicely.
+	reference Object
+}
 
 func parseLdc2_wInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -485,7 +503,14 @@ func parseLdc2_wInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &ldc2_wInstruction{*toReturn}, nil
+	return &ldc2_wInstruction{twoByteArgumentInstruction: *toReturn}, nil
+}
+
+func (n *ldc2_wInstruction) String() string {
+	if n.reference != nil {
+		return fmt.Sprintf("ldc2_w %s", n.reference)
+	}
+	return fmt.Sprintf("ldc2_w 0x%04x", n.value)
 }
 
 type iloadInstruction struct{ singleByteArgumentInstruction }

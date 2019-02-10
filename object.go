@@ -8,8 +8,3 @@ type Object interface {
 	TypeName() string
 	String() string
 }
-
-// A reference is generally an object, but should never be a primitive.
-type Reference interface {
-	Object
-}

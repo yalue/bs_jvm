@@ -52,11 +52,11 @@ func (e MethodNotFoundError) Error() string {
 // its initial method to return. It should not usually indicate a problem.
 var ThreadExitedError = fmt.Errorf("Thread exited")
 
-// This is returned when attempting to set an invalid stack frame.
-type BadFrameError int
+// This is returned when attempting to set an invalid stack size.
+type BadStackSizeError int
 
-func (e BadFrameError) Error() string {
-	return fmt.Sprintf("Invalid stack frame indicator: %d", int(e))
+func (e BadStackSizeError) Error() string {
+	return fmt.Sprintf("Attempted to set a bad stack size: %d", int(e))
 }
 
 // This is returned if an attempt to operate on invalid data is detected during
@@ -65,4 +65,12 @@ type TypeError string
 
 func (e TypeError) Error() string {
 	return fmt.Sprintf("Type error: %s", string(e))
+}
+
+// This is returned when attempting to access an invalid local variable.
+type BadLocalVariableError int
+
+func (e BadLocalVariableError) Error() string {
+	return fmt.Sprintf("Attempted to access an invalid local variable at "+
+		"index %d", int(e))
 }

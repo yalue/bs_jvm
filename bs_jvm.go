@@ -22,6 +22,9 @@ type Thread struct {
 	Stack           DataStack
 	References      ReferenceStack
 	ReturnLocations CallStack
+	// The list of local variables, starting with arguments.
+	// TODO: Initialize LocalVariables for a thread.
+	LocalVariables []Object
 	// A channel that will contain the thread exit reason when the thread has
 	// finished.
 	threadComplete chan error
@@ -44,7 +47,6 @@ func (t *Thread) Run() error {
 		var n Instruction
 		for e == nil {
 			if t.ThreadExitReason != nil {
-				t.ThreadExitReason = e
 				t.threadComplete <- t.ThreadExitReason
 				close(t.threadComplete)
 				return
@@ -93,33 +95,35 @@ func (t *Thread) EndThread(e error) {
 
 // To be used when the current instruction is calling a method. The returned
 // frame should be "restored" when the called method returns.
-func (t *Thread) GetReturnFrame() MethodFrame {
-	return MethodFrame{
-		Method:         t.CurrentMethod,
-		ReturnIndex:    t.InstructionIndex + 1,
-		ReferenceFrame: t.References.GetFrame(),
-		DataFrame:      t.Stack.GetFrame(),
+func (t *Thread) GetReturnInfo() ReturnInfo {
+	return ReturnInfo{
+		Method:             t.CurrentMethod,
+		ReturnIndex:        t.InstructionIndex + 1,
+		ReferenceStackSize: t.References.GetSize(),
+		DataStackSize:      t.Stack.GetSize(),
+		LocalVariables:     t.LocalVariables,
 	}
 }
 
-// Restores the given method frame. Does not modify f.
-func (t *Thread) RestoreFrame(f *MethodFrame) {
-	t.CurrentMethod = f.Method
-	t.InstructionIndex = f.ReturnIndex
-	t.References.SetFrame(f.ReferenceFrame)
-	t.Stack.SetFrame(f.DataFrame)
+// Restores the given method frame. Does not modify r. Used when returning.
+func (t *Thread) RestoreReturnInfo(r *ReturnInfo) {
+	t.CurrentMethod = r.Method
+	t.InstructionIndex = r.ReturnIndex
+	t.References.SetSize(r.ReferenceStackSize)
+	t.Stack.SetSize(r.DataStackSize)
+	t.LocalVariables = r.LocalVariables
 }
 
 // Carries out a method call, including pushing the return location. Returns an
 // error if one occurs. Expects the instruction index to point at the
 // instruction causing the call.
 func (t *Thread) Call(method *Method) error {
-	// TODO: Test call/ret when ready--how are arguments passed?
+	// TODO: Initialize local variables of the called method.
 	if (t.InstructionIndex + 1) >= uint(len(t.CurrentMethod.Instructions)) {
 		return fmt.Errorf("Invalid return address (inst. index %d)",
 			t.InstructionIndex)
 	}
-	e := t.ReturnLocations.Push(t.GetReturnFrame())
+	e := t.ReturnLocations.Push(t.GetReturnInfo())
 	if e != nil {
 		return e
 	}
@@ -131,7 +135,7 @@ func (t *Thread) Call(method *Method) error {
 // Carries out a method return, popping a return location. If the thread's
 // initial method returns in the thread, this ends the thread and returns nil.
 func (t *Thread) Return() error {
-	frame, e := t.ReturnLocations.Pop()
+	returnInfo, e := t.ReturnLocations.Pop()
 	if e == StackEmptyError {
 		t.EndThread(ThreadExitedError)
 		return nil
@@ -139,7 +143,7 @@ func (t *Thread) Return() error {
 	if e != nil {
 		return e
 	}
-	t.RestoreFrame(&frame)
+	t.RestoreReturnInfo(&returnInfo)
 	return nil
 }
 

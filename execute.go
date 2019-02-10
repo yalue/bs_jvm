@@ -82,50 +82,99 @@ func (n *ldcInstruction) Execute(t *Thread) error {
 }
 
 func (n *ldc_wInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	if n.isPrimitive {
+		return t.Stack.Push(n.primitiveValue)
+	}
+	return t.References.Push(n.reference)
 }
 
 func (n *ldc2_wInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Stack.PushLong(n.primitiveValue)
+}
+
+// Pushes an int from the local variable array onto the stack.
+func loadLocalInt(t *Thread, index int) error {
+	if index >= len(t.LocalVariables) {
+		return BadLocalVariableError(index)
+	}
+	o := t.LocalVariables[index]
+	v, ok := o.(Int)
+	if !ok {
+		return TypeError("Expected to load an int")
+	}
+	return t.Stack.Push(v)
 }
 
 func (n *iloadInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalInt(t, int(n.value))
 }
 
 func (n *lloadInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	if int(n.value) >= len(t.LocalVariables) {
+		return BadLocalVariableError(n.value)
+	}
+	o := t.LocalVariables[n.value]
+	v, ok := o.(Long)
+	if !ok {
+		return TypeError("Expected to load a long")
+	}
+	return t.Stack.PushLong(v)
 }
 
 func (n *floadInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	if int(n.value) >= len(t.LocalVariables) {
+		return BadLocalVariableError(n.value)
+	}
+	o := t.LocalVariables[n.value]
+	v, ok := o.(Float)
+	if !ok {
+		return TypeError("Expected to load a float")
+	}
+	return t.Stack.PushFloat(v)
 }
 
 func (n *dloadInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	if int(n.value) >= len(t.LocalVariables) {
+		return BadLocalVariableError(n.value)
+	}
+	o := t.LocalVariables[n.value]
+	v, ok := o.(Double)
+	if !ok {
+		return TypeError("Expected to load a double")
+	}
+	return t.Stack.PushDouble(v)
 }
 
 func (n *aloadInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	if int(n.value) >= len(t.LocalVariables) {
+		return BadLocalVariableError(n.value)
+	}
+	o := t.LocalVariables[n.value]
+	if o.IsPrimitive() {
+		return TypeError("Expected to load a reference")
+	}
+	return t.References.Push(o)
 }
 
 func (n *iload_0Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalInt(t, 0)
 }
 
 func (n *iload_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalInt(t, 1)
 }
 
 func (n *iload_2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalInt(t, 2)
 }
 
 func (n *iload_3Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalInt(t, 3)
 }
 
 func (n *lload_0Instruction) Execute(t *Thread) error {
+	// TODO (next): Implement lload_0. Start by implementing something like
+	// loadLocalInt for longs.
 	return NotImplementedError
 }
 
