@@ -1,5 +1,9 @@
 package bs_jvm
 
+import (
+	"fmt"
+)
+
 // This file contains functions for executing individual JVM instructions.
 
 func (n *nopInstruction) Execute(t *Thread) error {
@@ -100,7 +104,8 @@ func loadLocalInt(t *Thread, index int) error {
 	o := t.LocalVariables[index]
 	v, ok := o.(Int)
 	if !ok {
-		return TypeError("Expected to load an int")
+		return TypeError(fmt.Sprintf("Expected to load an int, got %s",
+			o.TypeName()))
 	}
 	return t.Stack.Push(v)
 }
@@ -109,51 +114,74 @@ func (n *iloadInstruction) Execute(t *Thread) error {
 	return loadLocalInt(t, int(n.value))
 }
 
-func (n *lloadInstruction) Execute(t *Thread) error {
-	if int(n.value) >= len(t.LocalVariables) {
-		return BadLocalVariableError(n.value)
+// Pushes a long from the local variable array onto the stack.
+func loadLocalLong(t *Thread, index int) error {
+	if index >= len(t.LocalVariables) {
+		return BadLocalVariableError(index)
 	}
-	o := t.LocalVariables[n.value]
+	o := t.LocalVariables[index]
 	v, ok := o.(Long)
 	if !ok {
-		return TypeError("Expected to load a long")
+		return TypeError(fmt.Sprintf("Expected to load a long, got %s",
+			o.TypeName()))
 	}
 	return t.Stack.PushLong(v)
 }
 
-func (n *floadInstruction) Execute(t *Thread) error {
-	if int(n.value) >= len(t.LocalVariables) {
-		return BadLocalVariableError(n.value)
+func (n *lloadInstruction) Execute(t *Thread) error {
+	return loadLocalLong(t, int(n.value))
+}
+
+// Pushes a float from the local variable array onto the stack.
+func loadLocalFloat(t *Thread, index int) error {
+	if index >= len(t.LocalVariables) {
+		return BadLocalVariableError(index)
 	}
-	o := t.LocalVariables[n.value]
+	o := t.LocalVariables[index]
 	v, ok := o.(Float)
 	if !ok {
-		return TypeError("Expected to load a float")
+		return TypeError(fmt.Sprintf("Expected to load a float, got %s",
+			o.TypeName()))
 	}
 	return t.Stack.PushFloat(v)
 }
 
-func (n *dloadInstruction) Execute(t *Thread) error {
-	if int(n.value) >= len(t.LocalVariables) {
-		return BadLocalVariableError(n.value)
+func (n *floadInstruction) Execute(t *Thread) error {
+	return loadLocalFloat(t, int(n.value))
+}
+
+// Pushes a double from the local variable array onto the stack
+func loadLocalDouble(t *Thread, index int) error {
+	if index >= len(t.LocalVariables) {
+		return BadLocalVariableError(index)
 	}
-	o := t.LocalVariables[n.value]
+	o := t.LocalVariables[index]
 	v, ok := o.(Double)
 	if !ok {
-		return TypeError("Expected to load a double")
+		return TypeError(fmt.Sprintf("Expected to load a double, got %s",
+			o.TypeName()))
 	}
 	return t.Stack.PushDouble(v)
 }
 
-func (n *aloadInstruction) Execute(t *Thread) error {
-	if int(n.value) >= len(t.LocalVariables) {
-		return BadLocalVariableError(n.value)
+func (n *dloadInstruction) Execute(t *Thread) error {
+	return loadLocalDouble(t, int(n.value))
+}
+
+func loadLocalReference(t *Thread, index int) error {
+	if index >= len(t.LocalVariables) {
+		return BadLocalVariableError(index)
 	}
-	o := t.LocalVariables[n.value]
+	o := t.LocalVariables[index]
 	if o.IsPrimitive() {
-		return TypeError("Expected to load a reference")
+		return TypeError(fmt.Sprintf("Expected to load a reference, got %s",
+			o.TypeName()))
 	}
 	return t.References.Push(o)
+}
+
+func (n *aloadInstruction) Execute(t *Thread) error {
+	return loadLocalReference(t, int(n.value))
 }
 
 func (n *iload_0Instruction) Execute(t *Thread) error {
@@ -173,80 +201,112 @@ func (n *iload_3Instruction) Execute(t *Thread) error {
 }
 
 func (n *lload_0Instruction) Execute(t *Thread) error {
-	// TODO (next): Implement lload_0. Start by implementing something like
-	// loadLocalInt for longs.
-	return NotImplementedError
+	return loadLocalLong(t, 0)
 }
 
 func (n *lload_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalLong(t, 1)
 }
 
 func (n *lload_2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalLong(t, 2)
 }
 
 func (n *lload_3Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalLong(t, 3)
 }
 
 func (n *fload_0Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalFloat(t, 0)
 }
 
 func (n *fload_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalFloat(t, 1)
 }
 
 func (n *fload_2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalFloat(t, 2)
 }
 
 func (n *fload_3Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalFloat(t, 3)
 }
 
 func (n *dload_0Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalDouble(t, 0)
 }
 
 func (n *dload_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalDouble(t, 1)
 }
 
 func (n *dload_2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalDouble(t, 2)
 }
 
 func (n *dload_3Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalDouble(t, 3)
 }
 
 func (n *aload_0Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalReference(t, 0)
 }
 
 func (n *aload_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalReference(t, 1)
 }
 
 func (n *aload_2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalReference(t, 2)
 }
 
 func (n *aload_3Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return loadLocalReference(t, 3)
 }
 
 func (n *ialoadInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := t.References.Pop()
+	if e != nil {
+		return e
+	}
+	i, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	a, ok := o.(IntArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected an int array, got %s",
+			o.TypeName()))
+	}
+	if int(i) >= len(a) {
+		return IndexOutOfBoundsError(i)
+	}
+	return t.Stack.Push(a[i])
 }
 
 func (n *laloadInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := t.References.Pop()
+	if e != nil {
+		return e
+	}
+	i, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	a, ok := o.(LongArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a long array, got %s",
+			o.TypeName()))
+	}
+	if int(i) >= len(a) {
+		return IndexOutOfBoundsError(i)
+	}
+	return t.Stack.PushLong(a[i])
 }
 
 func (n *faloadInstruction) Execute(t *Thread) error {
+	// TODO (next): Implement the faload instruction. First, implement a
+	// FloatArray type in array.go.
 	return NotImplementedError
 }
 

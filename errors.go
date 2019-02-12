@@ -74,3 +74,9 @@ func (e BadLocalVariableError) Error() string {
 	return fmt.Sprintf("Attempted to access an invalid local variable at "+
 		"index %d", int(e))
 }
+
+type IndexOutOfBoundsError uint64
+
+func (e IndexOutOfBoundsError) Error() string {
+	return fmt.Sprintf("Index out of bounds: %d", int(e))
+}
