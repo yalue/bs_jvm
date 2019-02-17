@@ -11,7 +11,7 @@ func (n *nopInstruction) Execute(t *Thread) error {
 }
 
 func (n *aconst_nullInstruction) Execute(t *Thread) error {
-	return t.References.Push(nil)
+	return t.Stack.PushRef(nil)
 }
 
 func (n *iconst_m1Instruction) Execute(t *Thread) error {
@@ -82,14 +82,14 @@ func (n *ldcInstruction) Execute(t *Thread) error {
 	if n.isPrimitive {
 		return t.Stack.Push(n.primitiveValue)
 	}
-	return t.References.Push(n.reference)
+	return t.Stack.PushRef(n.reference)
 }
 
 func (n *ldc_wInstruction) Execute(t *Thread) error {
 	if n.isPrimitive {
 		return t.Stack.Push(n.primitiveValue)
 	}
-	return t.References.Push(n.reference)
+	return t.Stack.PushRef(n.reference)
 }
 
 func (n *ldc2_wInstruction) Execute(t *Thread) error {
@@ -177,7 +177,7 @@ func loadLocalReference(t *Thread, index int) error {
 		return TypeError(fmt.Sprintf("Expected to load a reference, got %s",
 			o.TypeName()))
 	}
-	return t.References.Push(o)
+	return t.Stack.PushRef(o)
 }
 
 func (n *aloadInstruction) Execute(t *Thread) error {
@@ -265,7 +265,7 @@ func (n *aload_3Instruction) Execute(t *Thread) error {
 }
 
 func (n *ialoadInstruction) Execute(t *Thread) error {
-	o, e := t.References.Pop()
+	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -285,7 +285,7 @@ func (n *ialoadInstruction) Execute(t *Thread) error {
 }
 
 func (n *laloadInstruction) Execute(t *Thread) error {
-	o, e := t.References.Pop()
+	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -305,32 +305,127 @@ func (n *laloadInstruction) Execute(t *Thread) error {
 }
 
 func (n *faloadInstruction) Execute(t *Thread) error {
-	// TODO (next): Implement the faload instruction. First, implement a
-	// FloatArray type in array.go.
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	i, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	a, ok := o.(FloatArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a float array, got %s",
+			o.TypeName()))
+	}
+	if int(i) >= len(a) {
+		return IndexOutOfBoundsError(i)
+	}
+	return t.Stack.PushFloat(a[i])
 }
 
 func (n *daloadInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	i, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	a, ok := o.(DoubleArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a double array, got %s",
+			o.TypeName()))
+	}
+	if int(i) >= len(a) {
+		return IndexOutOfBoundsError(i)
+	}
+	return t.Stack.PushDouble(a[i])
 }
 
 func (n *aaloadInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	i, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	a, ok := o.(ReferenceArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a reference array, got %s",
+			o.TypeName()))
+	}
+	if int(i) >= len(a) {
+		return IndexOutOfBoundsError(i)
+	}
+	return t.Stack.PushRef(a[i])
 }
 
 func (n *baloadInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	i, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	a, ok := o.(ByteArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a byte array, got %s",
+			o.TypeName()))
+	}
+	if int(i) >= len(a) {
+		return IndexOutOfBoundsError(a[i])
+	}
+	return t.Stack.Push(Int(a[i]))
 }
 
 func (n *caloadInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	i, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	a, ok := o.(CharArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a char array, got %s",
+			o.TypeName()))
+	}
+	if int(i) >= len(a) {
+		return IndexOutOfBoundsError(a[i])
+	}
+	return t.Stack.Push(Int(uint32(a[i])))
 }
 
 func (n *saloadInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	i, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	a, ok := o.(ShortArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a short array, got %s",
+			o.TypeName()))
+	}
+	if int(i) >= len(a) {
+		return IndexOutOfBoundsError(a[i])
+	}
+	return t.Stack.Push(Int(a[i]))
 }
 
 func (n *istoreInstruction) Execute(t *Thread) error {
+	// TODO (next): Work on the istore instruction.
 	return NotImplementedError
 }
 

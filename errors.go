@@ -80,3 +80,10 @@ type IndexOutOfBoundsError uint64
 func (e IndexOutOfBoundsError) Error() string {
 	return fmt.Sprintf("Index out of bounds: %d", int(e))
 }
+
+// This is returned if an object reference is expected, but nil is found.
+type NullReferenceError string
+
+func (e NullReferenceError) Error() string {
+	return fmt.Sprintf("Null reference error: %s", string(e))
+}

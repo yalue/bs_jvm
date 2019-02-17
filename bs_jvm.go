@@ -18,10 +18,8 @@ type Thread struct {
 	ParentJVM *JVM
 	// The index of the current instruction in the method.
 	InstructionIndex uint
-	// The stack for this thread, split into separate groups.
-	Stack           DataStack
-	References      ReferenceStack
-	ReturnLocations CallStack
+	// The stack for this thread
+	Stack ThreadStack
 	// The list of local variables, starting with arguments.
 	// TODO: Initialize LocalVariables for a thread.
 	LocalVariables []Object
@@ -97,21 +95,23 @@ func (t *Thread) EndThread(e error) {
 // frame should be "restored" when the called method returns.
 func (t *Thread) GetReturnInfo() ReturnInfo {
 	return ReturnInfo{
-		Method:             t.CurrentMethod,
-		ReturnIndex:        t.InstructionIndex + 1,
-		ReferenceStackSize: t.References.GetSize(),
-		DataStackSize:      t.Stack.GetSize(),
-		LocalVariables:     t.LocalVariables,
+		Method:         t.CurrentMethod,
+		ReturnIndex:    t.InstructionIndex + 1,
+		StackState:     t.Stack.GetSizes(),
+		LocalVariables: t.LocalVariables,
 	}
 }
 
 // Restores the given method frame. Does not modify r. Used when returning.
-func (t *Thread) RestoreReturnInfo(r *ReturnInfo) {
+func (t *Thread) RestoreReturnInfo(r *ReturnInfo) error {
 	t.CurrentMethod = r.Method
 	t.InstructionIndex = r.ReturnIndex
-	t.References.SetSize(r.ReferenceStackSize)
-	t.Stack.SetSize(r.DataStackSize)
+	e := t.Stack.RestoreSizes(&(r.StackState))
+	if e != nil {
+		return e
+	}
 	t.LocalVariables = r.LocalVariables
+	return nil
 }
 
 // Carries out a method call, including pushing the return location. Returns an
@@ -123,7 +123,7 @@ func (t *Thread) Call(method *Method) error {
 		return fmt.Errorf("Invalid return address (inst. index %d)",
 			t.InstructionIndex)
 	}
-	e := t.ReturnLocations.Push(t.GetReturnInfo())
+	e := t.Stack.PushFrame(t.GetReturnInfo())
 	if e != nil {
 		return e
 	}
@@ -135,7 +135,7 @@ func (t *Thread) Call(method *Method) error {
 // Carries out a method return, popping a return location. If the thread's
 // initial method returns in the thread, this ends the thread and returns nil.
 func (t *Thread) Return() error {
-	returnInfo, e := t.ReturnLocations.Pop()
+	returnInfo, e := t.Stack.PopFrame()
 	if e == StackEmptyError {
 		t.EndThread(ThreadExitedError)
 		return nil
@@ -143,8 +143,7 @@ func (t *Thread) Return() error {
 	if e != nil {
 		return e
 	}
-	t.RestoreReturnInfo(&returnInfo)
-	return nil
+	return t.RestoreReturnInfo(&returnInfo)
 }
 
 // Holds state of the entire JVM, including threads, class files, etc.
@@ -282,8 +281,7 @@ func (j *JVM) StartThread(className, methodName string) error {
 		CurrentMethod:    method,
 		ParentJVM:        j,
 		InstructionIndex: 0,
-		Stack:            NewDataStack(4096 * 4),
-		ReturnLocations:  NewCallStack(1024),
+		Stack:            NewStack(),
 		threadComplete:   make(chan error),
 		threadIndex:      threadIndex,
 	}

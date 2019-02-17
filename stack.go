@@ -6,23 +6,36 @@ import (
 	"math"
 )
 
+const (
+	DefaultDataStackCapacity      = 4096 * 4
+	DefaultReferenceStackCapacity = 4096
+	DefaultCallStackCapacity      = 1024
+)
+
+// Holds the state of a thread's stack, to be used when calling or returning
+// from methods.
+type StackSizes struct {
+	DataStackSize      int
+	ReferenceStackSize int
+	IsRefStackSize     int
+}
+
 // Holds everything necessary to restore a previous method's frame and return
 // address.
 type ReturnInfo struct {
-	Method             *Method
-	ReturnIndex        uint
-	ReferenceStackSize int
-	DataStackSize      int
-	LocalVariables     []Object
+	Method         *Method
+	ReturnIndex    uint
+	StackState     StackSizes
+	LocalVariables []Object
 }
 
 // An interface for a function call stack. A thread can keep this separate from
 // its data stack.
 type CallStack interface {
 	// Used to push a return method and instruction index onto the call stack.
-	Push(f ReturnInfo) error
+	PushFrame(f ReturnInfo) error
 	// Used to pop a return method and instruction index from the stack.
-	Pop() (ReturnInfo, error)
+	PopFrame() (ReturnInfo, error)
 }
 
 // Implements the CallStack interface.
@@ -38,7 +51,7 @@ func NewCallStack(capacity uint32) CallStack {
 	}
 }
 
-func (s *basicCallStack) Push(f ReturnInfo) error {
+func (s *basicCallStack) PushFrame(f ReturnInfo) error {
 	if len(s.frames) >= cap(s.frames) {
 		return StackOverflowError
 	}
@@ -46,7 +59,7 @@ func (s *basicCallStack) Push(f ReturnInfo) error {
 	return nil
 }
 
-func (s *basicCallStack) Pop() (ReturnInfo, error) {
+func (s *basicCallStack) PopFrame() (ReturnInfo, error) {
 	if len(s.frames) == 0 {
 		return ReturnInfo{}, StackEmptyError
 	}
@@ -58,8 +71,8 @@ func (s *basicCallStack) Pop() (ReturnInfo, error) {
 // An interface for a thread's stack of references. This can be separate from
 // the data stack just for the sake of type checking.
 type ReferenceStack interface {
-	Push(r Object) error
-	Pop() (Object, error)
+	PushRef(r Object) error
+	PopRef() (Object, error)
 	// Returns the current stack top indicator, which can be restored later.
 	// Returns the current stack size, which can be restored later.
 	GetSize() int
@@ -72,7 +85,7 @@ type basicReferenceStack struct {
 	references []Object
 }
 
-func (s *basicReferenceStack) Push(r Object) error {
+func (s *basicReferenceStack) PushRef(r Object) error {
 	if len(s.references) >= cap(s.references) {
 		return StackOverflowError
 	}
@@ -80,7 +93,7 @@ func (s *basicReferenceStack) Push(r Object) error {
 	return nil
 }
 
-func (s *basicReferenceStack) Pop() (Object, error) {
+func (s *basicReferenceStack) PopRef() (Object, error) {
 	if len(s.references) == 0 {
 		return nil, StackEmptyError
 	}
@@ -99,6 +112,12 @@ func (s *basicReferenceStack) SetSize(n int) error {
 	}
 	s.references = s.references[0:n]
 	return nil
+}
+
+func NewReferenceStack(capacity uint32) ReferenceStack {
+	return &basicReferenceStack{
+		references: make([]Object, 0, capacity),
+	}
 }
 
 // An interface for a thread's data stack. Returns an error if a stack overflow
@@ -205,4 +224,173 @@ func NewDataStack(capacity uint32) DataStack {
 	return &basicDataStack{
 		data: make([]int32, 0, capacity),
 	}
+}
+
+// This interface is used for interacting with a thread's stack storage,
+// including the call stack.
+type ThreadStack interface {
+	Push(v Int) error
+	Pop() (Int, error)
+	PushLong(v Long) error
+	PopLong() (Long, error)
+	PushFloat(v Float) error
+	PopFloat() (Float, error)
+	PushDouble(v Double) error
+	PopDouble() (Double, error)
+	PushRef(r Object) error
+	PopRef() (Object, error)
+	// Used to push a return method and instruction index onto the call stack.
+	PushFrame(f ReturnInfo) error
+	// Used to pop a return method and instruction index from the stack.
+	PopFrame() (ReturnInfo, error)
+	// Backs up the sizes of the stacks so that they can be restored later.
+	GetSizes() StackSizes
+	// Restores the stack positions contained in the given call frame. Used
+	// when returning from a function.
+	RestoreSizes(*StackSizes) error
+}
+
+// Tracks stack data for a thread. Implements the stack interface.
+type basicStack struct {
+	data  DataStack
+	refs  ReferenceStack
+	calls CallStack
+	// Holds whether the previously-pushed value was a reference or a value.
+	// This is needed for supporting the STUPID untyped pop instruction.
+	IsRef []bool
+}
+
+func NewStack() ThreadStack {
+	return &basicStack{
+		data:  NewDataStack(DefaultDataStackCapacity),
+		refs:  NewReferenceStack(DefaultReferenceStackCapacity),
+		calls: NewCallStack(DefaultCallStackCapacity),
+		IsRef: make([]bool, 0, DefaultDataStackCapacity+
+			DefaultReferenceStackCapacity),
+	}
+}
+
+func (s *basicStack) Push(v Int) error {
+	e := s.data.Push(v)
+	if e == nil {
+		s.IsRef = append(s.IsRef, false)
+	}
+	return e
+}
+
+func (s *basicStack) Pop() (Int, error) {
+	v, e := s.data.Pop()
+	if e == nil {
+		s.IsRef = s.IsRef[0 : len(s.IsRef)-1]
+	}
+	return v, e
+}
+
+func (s *basicStack) PushLong(v Long) error {
+	e := s.data.PushLong(v)
+	if e == nil {
+		s.IsRef = append(s.IsRef, false)
+	}
+	return e
+}
+
+func (s *basicStack) PopLong() (Long, error) {
+	v, e := s.data.PopLong()
+	if e == nil {
+		s.IsRef = s.IsRef[0 : len(s.IsRef)-1]
+	}
+	return v, e
+}
+
+func (s *basicStack) PushFloat(v Float) error {
+	e := s.data.PushFloat(v)
+	if e == nil {
+		s.IsRef = append(s.IsRef, false)
+	}
+	return e
+}
+
+func (s *basicStack) PopFloat() (Float, error) {
+	v, e := s.data.PopFloat()
+	if e == nil {
+		s.IsRef = s.IsRef[0 : len(s.IsRef)-1]
+	}
+	return v, e
+}
+
+func (s *basicStack) PushDouble(v Double) error {
+	e := s.data.PushDouble(v)
+	if e == nil {
+		s.IsRef = append(s.IsRef, false)
+	}
+	return e
+}
+
+func (s *basicStack) PopDouble() (Double, error) {
+	v, e := s.data.PopDouble()
+	if e == nil {
+		s.IsRef = s.IsRef[0 : len(s.IsRef)-1]
+	}
+	return v, e
+}
+
+func (s *basicStack) PushRef(r Object) error {
+	e := s.refs.PushRef(r)
+	if e == nil {
+		s.IsRef = append(s.IsRef, true)
+	}
+	return e
+}
+
+func (s *basicStack) PopRef() (Object, error) {
+	r, e := s.refs.PopRef()
+	if e == nil {
+		s.IsRef = s.IsRef[0 : len(s.IsRef)-1]
+	}
+	return r, e
+}
+
+// Pops and returns an object reference from the stack. Returns an error if the
+// reference is nil.
+func PopRefNotNull(s ThreadStack) (Object, error) {
+	o, e := s.PopRef()
+	if e != nil {
+		return nil, e
+	}
+	if o == nil {
+		return nil, NullReferenceError("Expected to pop a non-null reference")
+	}
+	return o, nil
+}
+
+func (s *basicStack) PushFrame(f ReturnInfo) error {
+	return s.calls.PushFrame(f)
+}
+
+func (s *basicStack) PopFrame() (ReturnInfo, error) {
+	return s.calls.PopFrame()
+}
+
+func (s *basicStack) GetSizes() StackSizes {
+	return StackSizes{
+		DataStackSize:      s.data.GetSize(),
+		ReferenceStackSize: s.refs.GetSize(),
+		IsRefStackSize:     len(s.IsRef),
+	}
+}
+
+func (s *basicStack) RestoreSizes(sizes *StackSizes) error {
+	e := s.data.SetSize(sizes.DataStackSize)
+	if e != nil {
+		return e
+	}
+	e = s.refs.SetSize(sizes.ReferenceStackSize)
+	if e != nil {
+		return e
+	}
+	if sizes.IsRefStackSize > len(s.IsRef) {
+		return BadStackSizeError(sizes.IsRefStackSize)
+	}
+	s.IsRef = s.IsRef[0:sizes.IsRefStackSize]
+	return nil
 }
