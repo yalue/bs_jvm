@@ -585,37 +585,224 @@ func (n *astore_3Instruction) Execute(t *Thread) error {
 	return storeLocalRef(t, 3)
 }
 
+// A short utility function to check whether an integer index is in the range
+// of a given array size. Returns an IndexOutOfBoundsError if the index is
+// invalid.
+func checkArrayIndex(index Int, arrayLength int) error {
+	if index < 0 {
+		return IndexOutOfBoundsError(index)
+	}
+	if int(index) < arrayLength {
+		return nil
+	}
+	return IndexOutOfBoundsError(index)
+}
 func (n *iastoreInstruction) Execute(t *Thread) error {
-	// TODO (next): Implement array store instructions, starting with iastore.
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	a, ok := o.(IntArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected an int array, got %s",
+			o.TypeName()))
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	e = checkArrayIndex(index, len(a))
+	if e != nil {
+		return e
+	}
+	value, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	a[index] = value
+	return nil
 }
 
 func (n *lastoreInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	a, ok := o.(LongArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a long array, got %s",
+			o.TypeName()))
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	e = checkArrayIndex(index, len(a))
+	if e != nil {
+		return e
+	}
+	value, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	a[index] = value
+	return nil
 }
 
 func (n *fastoreInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	a, ok := o.(FloatArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a float array, got %s",
+			o.TypeName()))
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	e = checkArrayIndex(index, len(a))
+	if e != nil {
+		return e
+	}
+	value, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	a[index] = value
+	return nil
 }
 
 func (n *dastoreInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	a, ok := o.(DoubleArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a double array, got %s",
+			o.TypeName()))
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	e = checkArrayIndex(index, len(a))
+	if e != nil {
+		return e
+	}
+	value, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	a[index] = value
+	return nil
 }
 
 func (n *aastoreInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	a, ok := o.(ReferenceArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a reference array, got %s",
+			o.TypeName()))
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	e = checkArrayIndex(index, len(a))
+	if e != nil {
+		return e
+	}
+	value, e := t.Stack.PopRef()
+	if e != nil {
+		return e
+	}
+	a[index] = value
+	return nil
 }
 
 func (n *bastoreInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	a, ok := o.(ByteArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a byte array, got %s",
+			o.TypeName()))
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	e = checkArrayIndex(index, len(a))
+	if e != nil {
+		return e
+	}
+	value, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	a[index] = Byte(value)
+	return nil
 }
 
 func (n *castoreInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	a, ok := o.(CharArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a char array, got %s",
+			o.TypeName()))
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	e = checkArrayIndex(index, len(a))
+	if e != nil {
+		return e
+	}
+	value, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	a[index] = Char(value)
+	return nil
 }
 
 func (n *sastoreInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := PopRefNotNull(t.Stack)
+	if e != nil {
+		return e
+	}
+	a, ok := o.(ShortArray)
+	if !ok {
+		return TypeError(fmt.Sprintf("Expected a short array, got %s",
+			o.TypeName()))
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	e = checkArrayIndex(index, len(a))
+	if e != nil {
+		return e
+	}
+	value, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	a[index] = Short(value)
+	return nil
 }
 
 func (n *popInstruction) Execute(t *Thread) error {
