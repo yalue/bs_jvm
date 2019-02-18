@@ -424,108 +424,169 @@ func (n *saloadInstruction) Execute(t *Thread) error {
 	return t.Stack.Push(Int(a[i]))
 }
 
+// Pushes an int from the local variable array onto the stack.
+func storeLocalInt(t *Thread, index int) error {
+	if index >= len(t.LocalVariables) {
+		return BadLocalVariableError(index)
+	}
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	t.LocalVariables[index] = v
+	return nil
+}
+
 func (n *istoreInstruction) Execute(t *Thread) error {
-	// TODO (next): Work on the istore instruction.
-	return NotImplementedError
+	return storeLocalInt(t, int(n.value))
+}
+
+func storeLocalLong(t *Thread, index int) error {
+	if index >= len(t.LocalVariables) {
+		return BadLocalVariableError(index)
+	}
+	v, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	t.LocalVariables[index] = v
+	return nil
 }
 
 func (n *lstoreInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalLong(t, int(n.value))
+}
+
+func storeLocalFloat(t *Thread, index int) error {
+	if index >= len(t.LocalVariables) {
+		return BadLocalVariableError(index)
+	}
+	v, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	t.LocalVariables[index] = v
+	return nil
 }
 
 func (n *fstoreInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalFloat(t, int(n.value))
+}
+
+func storeLocalDouble(t *Thread, index int) error {
+	if index >= len(t.LocalVariables) {
+		return BadLocalVariableError(index)
+	}
+	v, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	t.LocalVariables[index] = v
+	return nil
 }
 
 func (n *dstoreInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalDouble(t, int(n.value))
+}
+
+func storeLocalRef(t *Thread, index int) error {
+	if index >= len(t.LocalVariables) {
+		return BadLocalVariableError(index)
+	}
+	v, e := t.Stack.PopRef()
+	if e != nil {
+		return e
+	}
+	t.LocalVariables[index] = v
+	return nil
 }
 
 func (n *astoreInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalRef(t, int(n.value))
 }
 
 func (n *istore_0Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalInt(t, 0)
 }
 
 func (n *istore_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalInt(t, 1)
 }
 
 func (n *istore_2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalInt(t, 2)
 }
 
 func (n *istore_3Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalInt(t, 3)
 }
 
 func (n *lstore_0Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalLong(t, 0)
 }
 
 func (n *lstore_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalLong(t, 1)
 }
 
 func (n *lstore_2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalLong(t, 2)
 }
 
 func (n *lstore_3Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalLong(t, 3)
 }
 
 func (n *fstore_0Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalFloat(t, 0)
 }
 
 func (n *fstore_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalFloat(t, 1)
 }
 
 func (n *fstore_2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalFloat(t, 2)
 }
 
 func (n *fstore_3Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalFloat(t, 3)
 }
 
 func (n *dstore_0Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalDouble(t, 0)
 }
 
 func (n *dstore_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalDouble(t, 1)
 }
 
 func (n *dstore_2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalDouble(t, 2)
 }
 
 func (n *dstore_3Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalDouble(t, 3)
 }
 
 func (n *astore_0Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalRef(t, 0)
 }
 
 func (n *astore_1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalRef(t, 1)
 }
 
 func (n *astore_2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalRef(t, 2)
 }
 
 func (n *astore_3Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return storeLocalRef(t, 3)
 }
 
 func (n *iastoreInstruction) Execute(t *Thread) error {
+	// TODO (next): Implement array store instructions, starting with iastore.
 	return NotImplementedError
 }
 
