@@ -265,11 +265,11 @@ func (n *aload_3Instruction) Execute(t *Thread) error {
 }
 
 func (n *ialoadInstruction) Execute(t *Thread) error {
-	o, e := PopRefNotNull(t.Stack)
+	i, e := t.Stack.Pop()
 	if e != nil {
 		return e
 	}
-	i, e := t.Stack.Pop()
+	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -278,18 +278,19 @@ func (n *ialoadInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected an int array, got %s",
 			o.TypeName()))
 	}
-	if int(i) >= len(a) {
-		return IndexOutOfBoundsError(i)
+	e = checkArrayIndex(i, len(a))
+	if e != nil {
+		return e
 	}
 	return t.Stack.Push(a[i])
 }
 
 func (n *laloadInstruction) Execute(t *Thread) error {
-	o, e := PopRefNotNull(t.Stack)
+	i, e := t.Stack.Pop()
 	if e != nil {
 		return e
 	}
-	i, e := t.Stack.Pop()
+	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -298,18 +299,19 @@ func (n *laloadInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a long array, got %s",
 			o.TypeName()))
 	}
-	if int(i) >= len(a) {
-		return IndexOutOfBoundsError(i)
+	e = checkArrayIndex(i, len(a))
+	if e != nil {
+		return e
 	}
 	return t.Stack.PushLong(a[i])
 }
 
 func (n *faloadInstruction) Execute(t *Thread) error {
-	o, e := PopRefNotNull(t.Stack)
+	i, e := t.Stack.Pop()
 	if e != nil {
 		return e
 	}
-	i, e := t.Stack.Pop()
+	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -318,18 +320,19 @@ func (n *faloadInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a float array, got %s",
 			o.TypeName()))
 	}
-	if int(i) >= len(a) {
-		return IndexOutOfBoundsError(i)
+	e = checkArrayIndex(i, len(a))
+	if e != nil {
+		return e
 	}
 	return t.Stack.PushFloat(a[i])
 }
 
 func (n *daloadInstruction) Execute(t *Thread) error {
-	o, e := PopRefNotNull(t.Stack)
+	i, e := t.Stack.Pop()
 	if e != nil {
 		return e
 	}
-	i, e := t.Stack.Pop()
+	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -338,18 +341,19 @@ func (n *daloadInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a double array, got %s",
 			o.TypeName()))
 	}
-	if int(i) >= len(a) {
-		return IndexOutOfBoundsError(i)
+	e = checkArrayIndex(i, len(a))
+	if e != nil {
+		return e
 	}
 	return t.Stack.PushDouble(a[i])
 }
 
 func (n *aaloadInstruction) Execute(t *Thread) error {
-	o, e := PopRefNotNull(t.Stack)
+	i, e := t.Stack.Pop()
 	if e != nil {
 		return e
 	}
-	i, e := t.Stack.Pop()
+	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -358,18 +362,19 @@ func (n *aaloadInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a reference array, got %s",
 			o.TypeName()))
 	}
-	if int(i) >= len(a) {
-		return IndexOutOfBoundsError(i)
+	e = checkArrayIndex(i, len(a))
+	if e != nil {
+		return e
 	}
 	return t.Stack.PushRef(a[i])
 }
 
 func (n *baloadInstruction) Execute(t *Thread) error {
-	o, e := PopRefNotNull(t.Stack)
+	i, e := t.Stack.Pop()
 	if e != nil {
 		return e
 	}
-	i, e := t.Stack.Pop()
+	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -378,18 +383,19 @@ func (n *baloadInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a byte array, got %s",
 			o.TypeName()))
 	}
-	if int(i) >= len(a) {
-		return IndexOutOfBoundsError(a[i])
+	e = checkArrayIndex(i, len(a))
+	if e != nil {
+		return e
 	}
 	return t.Stack.Push(Int(a[i]))
 }
 
 func (n *caloadInstruction) Execute(t *Thread) error {
-	o, e := PopRefNotNull(t.Stack)
+	i, e := t.Stack.Pop()
 	if e != nil {
 		return e
 	}
-	i, e := t.Stack.Pop()
+	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -398,18 +404,19 @@ func (n *caloadInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a char array, got %s",
 			o.TypeName()))
 	}
-	if int(i) >= len(a) {
-		return IndexOutOfBoundsError(a[i])
+	e = checkArrayIndex(i, len(a))
+	if e != nil {
+		return e
 	}
 	return t.Stack.Push(Int(uint32(a[i])))
 }
 
 func (n *saloadInstruction) Execute(t *Thread) error {
-	o, e := PopRefNotNull(t.Stack)
+	i, e := t.Stack.Pop()
 	if e != nil {
 		return e
 	}
-	i, e := t.Stack.Pop()
+	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -418,8 +425,9 @@ func (n *saloadInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a short array, got %s",
 			o.TypeName()))
 	}
-	if int(i) >= len(a) {
-		return IndexOutOfBoundsError(a[i])
+	e = checkArrayIndex(i, len(a))
+	if e != nil {
+		return e
 	}
 	return t.Stack.Push(Int(a[i]))
 }
@@ -597,7 +605,16 @@ func checkArrayIndex(index Int, arrayLength int) error {
 	}
 	return IndexOutOfBoundsError(index)
 }
+
 func (n *iastoreInstruction) Execute(t *Thread) error {
+	value, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
 	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
@@ -607,15 +624,7 @@ func (n *iastoreInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected an int array, got %s",
 			o.TypeName()))
 	}
-	index, e := t.Stack.Pop()
-	if e != nil {
-		return e
-	}
 	e = checkArrayIndex(index, len(a))
-	if e != nil {
-		return e
-	}
-	value, e := t.Stack.Pop()
 	if e != nil {
 		return e
 	}
@@ -624,6 +633,14 @@ func (n *iastoreInstruction) Execute(t *Thread) error {
 }
 
 func (n *lastoreInstruction) Execute(t *Thread) error {
+	value, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
 	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
@@ -633,15 +650,7 @@ func (n *lastoreInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a long array, got %s",
 			o.TypeName()))
 	}
-	index, e := t.Stack.Pop()
-	if e != nil {
-		return e
-	}
 	e = checkArrayIndex(index, len(a))
-	if e != nil {
-		return e
-	}
-	value, e := t.Stack.PopLong()
 	if e != nil {
 		return e
 	}
@@ -650,6 +659,14 @@ func (n *lastoreInstruction) Execute(t *Thread) error {
 }
 
 func (n *fastoreInstruction) Execute(t *Thread) error {
+	value, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
 	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
@@ -659,15 +676,7 @@ func (n *fastoreInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a float array, got %s",
 			o.TypeName()))
 	}
-	index, e := t.Stack.Pop()
-	if e != nil {
-		return e
-	}
 	e = checkArrayIndex(index, len(a))
-	if e != nil {
-		return e
-	}
-	value, e := t.Stack.PopFloat()
 	if e != nil {
 		return e
 	}
@@ -676,6 +685,14 @@ func (n *fastoreInstruction) Execute(t *Thread) error {
 }
 
 func (n *dastoreInstruction) Execute(t *Thread) error {
+	value, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
 	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
@@ -685,15 +702,7 @@ func (n *dastoreInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a double array, got %s",
 			o.TypeName()))
 	}
-	index, e := t.Stack.Pop()
-	if e != nil {
-		return e
-	}
 	e = checkArrayIndex(index, len(a))
-	if e != nil {
-		return e
-	}
-	value, e := t.Stack.PopDouble()
 	if e != nil {
 		return e
 	}
@@ -702,6 +711,14 @@ func (n *dastoreInstruction) Execute(t *Thread) error {
 }
 
 func (n *aastoreInstruction) Execute(t *Thread) error {
+	value, e := t.Stack.PopRef()
+	if e != nil {
+		return e
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
 	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
@@ -711,15 +728,7 @@ func (n *aastoreInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a reference array, got %s",
 			o.TypeName()))
 	}
-	index, e := t.Stack.Pop()
-	if e != nil {
-		return e
-	}
 	e = checkArrayIndex(index, len(a))
-	if e != nil {
-		return e
-	}
-	value, e := t.Stack.PopRef()
 	if e != nil {
 		return e
 	}
@@ -728,6 +737,14 @@ func (n *aastoreInstruction) Execute(t *Thread) error {
 }
 
 func (n *bastoreInstruction) Execute(t *Thread) error {
+	value, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
 	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
@@ -737,15 +754,7 @@ func (n *bastoreInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a byte array, got %s",
 			o.TypeName()))
 	}
-	index, e := t.Stack.Pop()
-	if e != nil {
-		return e
-	}
 	e = checkArrayIndex(index, len(a))
-	if e != nil {
-		return e
-	}
-	value, e := t.Stack.Pop()
 	if e != nil {
 		return e
 	}
@@ -754,6 +763,14 @@ func (n *bastoreInstruction) Execute(t *Thread) error {
 }
 
 func (n *castoreInstruction) Execute(t *Thread) error {
+	value, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
 	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
@@ -763,15 +780,7 @@ func (n *castoreInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a char array, got %s",
 			o.TypeName()))
 	}
-	index, e := t.Stack.Pop()
-	if e != nil {
-		return e
-	}
 	e = checkArrayIndex(index, len(a))
-	if e != nil {
-		return e
-	}
-	value, e := t.Stack.Pop()
 	if e != nil {
 		return e
 	}
@@ -780,6 +789,14 @@ func (n *castoreInstruction) Execute(t *Thread) error {
 }
 
 func (n *sastoreInstruction) Execute(t *Thread) error {
+	value, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	index, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
 	o, e := PopRefNotNull(t.Stack)
 	if e != nil {
 		return e
@@ -789,15 +806,7 @@ func (n *sastoreInstruction) Execute(t *Thread) error {
 		return TypeError(fmt.Sprintf("Expected a short array, got %s",
 			o.TypeName()))
 	}
-	index, e := t.Stack.Pop()
-	if e != nil {
-		return e
-	}
 	e = checkArrayIndex(index, len(a))
-	if e != nil {
-		return e
-	}
-	value, e := t.Stack.Pop()
 	if e != nil {
 		return e
 	}
@@ -806,90 +815,263 @@ func (n *sastoreInstruction) Execute(t *Thread) error {
 }
 
 func (n *popInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	_, e := t.Stack.PopUnconditional()
+	return e
 }
 
 func (n *pop2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	_, e := t.Stack.PopUnconditional()
+	if e != nil {
+		return e
+	}
+	_, e = t.Stack.PopUnconditional()
+	return e
 }
 
 func (n *dupInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	o, e := t.Stack.PopUnconditional()
+	if e != nil {
+		return e
+	}
+	e = t.Stack.PushUnconditional(o)
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushUnconditional(o)
+}
+
+// Pushes multiple values onto the stack, returning an error if any one of the
+// pushes returned an error. Values are pushed in the order they are listed, so
+// the first value is pushed first, etc.
+func pushMultiUnconditional(stack ThreadStack, values ...Object) error {
+	var e error
+	for _, v := range values {
+		e = stack.PushUnconditional(v)
+		if e != nil {
+			return e
+		}
+	}
+	return nil
 }
 
 func (n *dup_x1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	top, e := t.Stack.PopUnconditional()
+	if e != nil {
+		return e
+	}
+	second, e := t.Stack.PopUnconditional()
+	if e != nil {
+		return e
+	}
+	return pushMultiUnconditional(t.Stack, top, second, top)
 }
 
 func (n *dup_x2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	var o [3]Object
+	var e error
+	for i := range o {
+		o[i], e = t.Stack.PopUnconditional()
+		if e != nil {
+			return e
+		}
+	}
+	return pushMultiUnconditional(t.Stack, o[0], o[2], o[1], o[0])
 }
 
 func (n *dup2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	top, e := t.Stack.PopUnconditional()
+	if e != nil {
+		return e
+	}
+	second, e := t.Stack.PopUnconditional()
+	if e != nil {
+		return e
+	}
+	return pushMultiUnconditional(t.Stack, second, top, second, top)
 }
 
 func (n *dup2_x1Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	var o [3]Object
+	var e error
+	for i := range o {
+		o[i], e = t.Stack.PopUnconditional()
+		if e != nil {
+			return e
+		}
+	}
+	return pushMultiUnconditional(t.Stack, o[1], o[0], o[2], o[1], o[0])
 }
 
 func (n *dup2_x2Instruction) Execute(t *Thread) error {
-	return NotImplementedError
+	var o [4]Object
+	var e error
+	for i := range o {
+		o[i], e = t.Stack.PopUnconditional()
+		if e != nil {
+			return e
+		}
+	}
+	return pushMultiUnconditional(t.Stack, o[1], o[0], o[3], o[2], o[1], o[0])
 }
 
 func (n *swapInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	top, e := t.Stack.PopUnconditional()
+	if e != nil {
+		return e
+	}
+	second, e := t.Stack.PopUnconditional()
+	if e != nil {
+		return e
+	}
+	return pushMultiUnconditional(t.Stack, top, second)
 }
 
 func (n *iaddInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(a + b)
 }
 
 func (n *laddInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(a + b)
 }
 
 func (n *faddInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushFloat(a + b)
 }
 
 func (n *daddInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushDouble(a + b)
 }
 
 func (n *isubInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(b - a)
 }
 
 func (n *lsubInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(b - a)
 }
 
 func (n *fsubInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushFloat(b - a)
 }
 
 func (n *dsubInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushDouble(b - a)
 }
 
 func (n *imulInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(a * b)
 }
 
 func (n *lmulInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(a * b)
 }
 
 func (n *fmulInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushFloat(a * b)
 }
 
 func (n *dmulInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushDouble(a * b)
 }
 
 func (n *idivInstruction) Execute(t *Thread) error {
+	// TODO (next): Continue implementing the idiv instruction.
 	return NotImplementedError
 }
 

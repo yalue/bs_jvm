@@ -76,6 +76,7 @@ func (c Char) IsPrimitive() bool {
 	return true
 }
 
+// TODO: Remove the bool type? Where is it used?
 type Bool bool
 
 func (b Bool) String() string {

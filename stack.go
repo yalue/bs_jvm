@@ -239,6 +239,14 @@ type ThreadStack interface {
 	PopDouble() (Double, error)
 	PushRef(r Object) error
 	PopRef() (Object, error)
+	// Pops whatever was the most recently pushed, either a primitive or a
+	// reference. If the most recently pushed thing was a primitive, this will
+	// return an int regardless of what type of primitive was pushed.
+	PopUnconditional() (Object, error)
+	// Pushes an arbitrary object. If the object is a primitive, it will be
+	// pushed onto the data stack. Otherwise, it will be pushed onto the
+	// reference stack.
+	PushUnconditional(o Object) error
 	// Used to push a return method and instruction index onto the call stack.
 	PushFrame(f ReturnInfo) error
 	// Used to pop a return method and instruction index from the stack.
@@ -289,7 +297,7 @@ func (s *basicStack) Pop() (Int, error) {
 func (s *basicStack) PushLong(v Long) error {
 	e := s.data.PushLong(v)
 	if e == nil {
-		s.IsRef = append(s.IsRef, false)
+		s.IsRef = append(s.IsRef, false, false)
 	}
 	return e
 }
@@ -297,7 +305,7 @@ func (s *basicStack) PushLong(v Long) error {
 func (s *basicStack) PopLong() (Long, error) {
 	v, e := s.data.PopLong()
 	if e == nil {
-		s.IsRef = s.IsRef[0 : len(s.IsRef)-1]
+		s.IsRef = s.IsRef[0 : len(s.IsRef)-2]
 	}
 	return v, e
 }
@@ -321,7 +329,7 @@ func (s *basicStack) PopFloat() (Float, error) {
 func (s *basicStack) PushDouble(v Double) error {
 	e := s.data.PushDouble(v)
 	if e == nil {
-		s.IsRef = append(s.IsRef, false)
+		s.IsRef = append(s.IsRef, false, false)
 	}
 	return e
 }
@@ -329,7 +337,7 @@ func (s *basicStack) PushDouble(v Double) error {
 func (s *basicStack) PopDouble() (Double, error) {
 	v, e := s.data.PopDouble()
 	if e == nil {
-		s.IsRef = s.IsRef[0 : len(s.IsRef)-1]
+		s.IsRef = s.IsRef[0 : len(s.IsRef)-2]
 	}
 	return v, e
 }
@@ -348,6 +356,42 @@ func (s *basicStack) PopRef() (Object, error) {
 		s.IsRef = s.IsRef[0 : len(s.IsRef)-1]
 	}
 	return r, e
+}
+
+func (s *basicStack) PopUnconditional() (Object, error) {
+	if s.IsRef[len(s.IsRef)-1] {
+		return s.PopRef()
+	}
+	return s.Pop()
+}
+
+func (s *basicStack) PushUnconditional(o Object) error {
+	if !o.IsPrimitive() {
+		return s.PushRef(o)
+	}
+	switch v := o.(type) {
+	case Int:
+		return s.Push(v)
+	case Long:
+		return s.PushLong(v)
+	case Float:
+		return s.PushFloat(v)
+	case Double:
+		return s.PushDouble(v)
+	case Short:
+		return s.Push(Int(v))
+	case Char:
+		return s.Push(Int(uint32(v)))
+	case Byte:
+		return s.Push(Int(v))
+	case Bool:
+		if v {
+			return s.Push(1)
+		} else {
+			return s.Push(0)
+		}
+	}
+	return TypeError("Bad PushUnconditional object type: " + o.TypeName())
 }
 
 // Pops and returns an object reference from the stack. Returns an error if the
