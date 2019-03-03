@@ -2,6 +2,7 @@ package bs_jvm
 
 import (
 	"fmt"
+	"math"
 )
 
 // This file contains functions for executing individual JVM instructions.
@@ -926,12 +927,60 @@ func (n *swapInstruction) Execute(t *Thread) error {
 	return pushMultiUnconditional(t.Stack, top, second)
 }
 
-func (n *iaddInstruction) Execute(t *Thread) error {
-	a, e := t.Stack.Pop()
+// Pops and returns 2 ints from the stack. The first return value was the top.
+func pop2Int(s ThreadStack) (Int, Int, error) {
+	a, e := s.Pop()
 	if e != nil {
-		return e
+		return 0, 0, e
 	}
-	b, e := t.Stack.Pop()
+	b, e := s.Pop()
+	if e != nil {
+		return 0, 0, e
+	}
+	return a, b, nil
+}
+
+// Like pop2Int, but for longs.
+func pop2Long(s ThreadStack) (Long, Long, error) {
+	a, e := s.PopLong()
+	if e != nil {
+		return 0, 0, e
+	}
+	b, e := s.PopLong()
+	if e != nil {
+		return 0, 0, e
+	}
+	return a, b, nil
+}
+
+// Like pop2Int, but for floats.
+func pop2Float(s ThreadStack) (Float, Float, error) {
+	a, e := s.PopFloat()
+	if e != nil {
+		return 0, 0, e
+	}
+	b, e := s.PopFloat()
+	if e != nil {
+		return 0, 0, e
+	}
+	return a, b, nil
+}
+
+// Like pop2Int, but for doubles.
+func pop2Double(s ThreadStack) (Double, Double, error) {
+	a, e := s.PopDouble()
+	if e != nil {
+		return 0, 0, e
+	}
+	b, e := s.PopDouble()
+	if e != nil {
+		return 0, 0, e
+	}
+	return a, b, nil
+}
+
+func (n *iaddInstruction) Execute(t *Thread) error {
+	a, b, e := pop2Int(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -939,11 +988,7 @@ func (n *iaddInstruction) Execute(t *Thread) error {
 }
 
 func (n *laddInstruction) Execute(t *Thread) error {
-	a, e := t.Stack.PopLong()
-	if e != nil {
-		return e
-	}
-	b, e := t.Stack.PopLong()
+	a, b, e := pop2Long(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -951,11 +996,7 @@ func (n *laddInstruction) Execute(t *Thread) error {
 }
 
 func (n *faddInstruction) Execute(t *Thread) error {
-	a, e := t.Stack.PopFloat()
-	if e != nil {
-		return e
-	}
-	b, e := t.Stack.PopFloat()
+	a, b, e := pop2Float(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -963,11 +1004,7 @@ func (n *faddInstruction) Execute(t *Thread) error {
 }
 
 func (n *daddInstruction) Execute(t *Thread) error {
-	a, e := t.Stack.PopDouble()
-	if e != nil {
-		return e
-	}
-	b, e := t.Stack.PopDouble()
+	a, b, e := pop2Double(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -975,11 +1012,7 @@ func (n *daddInstruction) Execute(t *Thread) error {
 }
 
 func (n *isubInstruction) Execute(t *Thread) error {
-	a, e := t.Stack.Pop()
-	if e != nil {
-		return e
-	}
-	b, e := t.Stack.Pop()
+	a, b, e := pop2Int(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -987,11 +1020,7 @@ func (n *isubInstruction) Execute(t *Thread) error {
 }
 
 func (n *lsubInstruction) Execute(t *Thread) error {
-	a, e := t.Stack.PopLong()
-	if e != nil {
-		return e
-	}
-	b, e := t.Stack.PopLong()
+	a, b, e := pop2Long(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -999,11 +1028,7 @@ func (n *lsubInstruction) Execute(t *Thread) error {
 }
 
 func (n *fsubInstruction) Execute(t *Thread) error {
-	a, e := t.Stack.PopFloat()
-	if e != nil {
-		return e
-	}
-	b, e := t.Stack.PopFloat()
+	a, b, e := pop2Float(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -1011,11 +1036,7 @@ func (n *fsubInstruction) Execute(t *Thread) error {
 }
 
 func (n *dsubInstruction) Execute(t *Thread) error {
-	a, e := t.Stack.PopDouble()
-	if e != nil {
-		return e
-	}
-	b, e := t.Stack.PopDouble()
+	a, b, e := pop2Double(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -1023,11 +1044,7 @@ func (n *dsubInstruction) Execute(t *Thread) error {
 }
 
 func (n *imulInstruction) Execute(t *Thread) error {
-	a, e := t.Stack.Pop()
-	if e != nil {
-		return e
-	}
-	b, e := t.Stack.Pop()
+	a, b, e := pop2Int(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -1035,11 +1052,7 @@ func (n *imulInstruction) Execute(t *Thread) error {
 }
 
 func (n *lmulInstruction) Execute(t *Thread) error {
-	a, e := t.Stack.PopLong()
-	if e != nil {
-		return e
-	}
-	b, e := t.Stack.PopLong()
+	a, b, e := pop2Long(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -1047,11 +1060,7 @@ func (n *lmulInstruction) Execute(t *Thread) error {
 }
 
 func (n *fmulInstruction) Execute(t *Thread) error {
-	a, e := t.Stack.PopFloat()
-	if e != nil {
-		return e
-	}
-	b, e := t.Stack.PopFloat()
+	a, b, e := pop2Float(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -1059,11 +1068,7 @@ func (n *fmulInstruction) Execute(t *Thread) error {
 }
 
 func (n *dmulInstruction) Execute(t *Thread) error {
-	a, e := t.Stack.PopDouble()
-	if e != nil {
-		return e
-	}
-	b, e := t.Stack.PopDouble()
+	a, b, e := pop2Double(t.Stack)
 	if e != nil {
 		return e
 	}
@@ -1071,79 +1076,188 @@ func (n *dmulInstruction) Execute(t *Thread) error {
 }
 
 func (n *idivInstruction) Execute(t *Thread) error {
-	// TODO (next): Continue implementing the idiv instruction.
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	if a == 0 {
+		return ArithmeticError("Division by zero")
+	}
+	return t.Stack.Push(b / a)
 }
 
 func (n *ldivInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Long(t.Stack)
+	if e != nil {
+		return e
+	}
+	if a == 0 {
+		return ArithmeticError("Division by zero")
+	}
+	return t.Stack.PushLong(b / a)
 }
 
 func (n *fdivInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Float(t.Stack)
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushFloat(b / a)
 }
 
 func (n *ddivInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Double(t.Stack)
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushDouble(b / a)
 }
 
 func (n *iremInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	if a == 0 {
+		return ArithmeticError("Division by zero")
+	}
+	return t.Stack.Push(b % a)
 }
 
 func (n *lremInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Long(t.Stack)
+	if e != nil {
+		return e
+	}
+	if a == 0 {
+		return ArithmeticError("Division by zero")
+	}
+	return t.Stack.PushLong(b % a)
+}
+
+// This is the same as the IEEE 754 remainder, but using truncation rather than
+// rounding.
+func javaRemainder(a, b float64) float64 {
+	return math.Remainder(math.Trunc(a), math.Trunc(b))
 }
 
 func (n *fremInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Float(t.Stack)
+	if e != nil {
+		return e
+	}
+	// This is required behavior according to the JVM spec.
+	if int64(a) == 0 {
+		return ArithmeticError("Division by zero")
+	}
+	return t.Stack.PushFloat(Float(javaRemainder(float64(b), float64(a))))
 }
 
 func (n *dremInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Double(t.Stack)
+	if e != nil {
+		return e
+	}
+	if int64(a) == 0 {
+		return ArithmeticError("Division by zero")
+	}
+	return t.Stack.PushDouble(Double(javaRemainder(float64(b), float64(a))))
 }
 
 func (n *inegInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(-a)
 }
 
 func (n *lnegInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(-a)
 }
 
 func (n *fnegInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushFloat(-a)
 }
 
 func (n *dnegInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushDouble(-a)
 }
 
 func (n *ishlInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(b << uint(a&0x1f))
 }
 
 func (n *lshlInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(b << uint(a&0x3f))
 }
 
 func (n *ishrInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(b >> uint(a&0x1f))
 }
 
 func (n *lshrInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(b >> uint(a&0x3f))
 }
 
 func (n *iushrInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(Int(uint32(b) >> uint32(a&0x1f)))
 }
 
 func (n *lushrInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(Long(uint64(b) >> uint64(a&0x3f)))
 }
 
 func (n *iandInstruction) Execute(t *Thread) error {
+	// TODO (next): Continue implementing, with iand.
 	return NotImplementedError
 }
 

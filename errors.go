@@ -87,3 +87,12 @@ type NullReferenceError string
 func (e NullReferenceError) Error() string {
 	return fmt.Sprintf("Null reference error: %s", string(e))
 }
+
+
+// This is usually returned if an instruction attempts to do something that
+// requires dividing by zero.
+type ArithmeticError string
+
+func (e ArithmeticError) Error() string {
+	return fmt.Sprintf("Arithmetic error: %s", string(e))
+}
