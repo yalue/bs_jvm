@@ -1938,8 +1938,8 @@ func parseLxorInstruction(opcode uint8, name string, address uint,
 
 // The iinc instruction is a fairly unique format, so it gets its own struct
 type iincInstruction struct {
-	offset uint8
-	value  uint8
+	index uint8
+	value uint8
 }
 
 func (n *iincInstruction) Raw() uint8 {
@@ -1947,7 +1947,7 @@ func (n *iincInstruction) Raw() uint8 {
 }
 
 func (n *iincInstruction) OtherBytes() []byte {
-	return []byte{n.offset, n.value}
+	return []byte{n.index, n.value}
 }
 
 func (n *iincInstruction) Length() uint {
@@ -1960,12 +1960,12 @@ func (n *iincInstruction) Optimize(m *Method, offset uint,
 }
 
 func (n *iincInstruction) String() string {
-	return fmt.Sprintf("iinc 0x%02x 0x%02x", n.offset, n.value)
+	return fmt.Sprintf("iinc 0x%02x 0x%02x", n.index, n.value)
 }
 
 func parseIincInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
-	offset, e := m.GetByte(address + 1)
+	index, e := m.GetByte(address + 1)
 	if e != nil {
 		return nil, fmt.Errorf("Failed getting iinc offset: %s", e)
 	}
@@ -1974,8 +1974,8 @@ func parseIincInstruction(opcode uint8, name string, address uint,
 		return nil, fmt.Errorf("Failed getting iinc value: %s", e)
 	}
 	toReturn := iincInstruction{
-		offset: offset,
-		value:  value,
+		index: index,
+		value: value,
 	}
 	return &toReturn, nil
 }
@@ -2240,7 +2240,10 @@ func parseDcmpgInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type ifeqInstruction struct{ twoByteArgumentInstruction }
+type ifeqInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIfeqInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2248,10 +2251,13 @@ func parseIfeqInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &ifeqInstruction{*toReturn}, nil
+	return &ifeqInstruction{*toReturn, 0}, nil
 }
 
-type ifneInstruction struct{ twoByteArgumentInstruction }
+type ifneInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIfneInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2259,7 +2265,7 @@ func parseIfneInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &ifneInstruction{*toReturn}, nil
+	return &ifneInstruction{*toReturn, 0}, nil
 }
 
 type ifltInstruction struct{ twoByteArgumentInstruction }

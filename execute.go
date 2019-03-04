@@ -97,16 +97,26 @@ func (n *ldc2_wInstruction) Execute(t *Thread) error {
 	return t.Stack.PushLong(n.primitiveValue)
 }
 
-// Pushes an int from the local variable array onto the stack.
-func loadLocalInt(t *Thread, index int) error {
+// Reads an int from the local variables and returns it. Returns an error if
+// the given index doesn't contain an int.
+func getLocalInt(t *Thread, index int) (Int, error) {
 	if index >= len(t.LocalVariables) {
-		return BadLocalVariableError(index)
+		return 0, BadLocalVariableError(index)
 	}
 	o := t.LocalVariables[index]
 	v, ok := o.(Int)
 	if !ok {
-		return TypeError(fmt.Sprintf("Expected to load an int, got %s",
+		return 0, TypeError(fmt.Sprintf("Expected to read a local int, got %s",
 			o.TypeName()))
+	}
+	return v, nil
+}
+
+// Pushes an int from the local variable array onto the stack.
+func loadLocalInt(t *Thread, index int) error {
+	v, e := getLocalInt(t, index)
+	if e != nil {
+		return e
 	}
 	return t.Stack.Push(v)
 }
@@ -1257,123 +1267,290 @@ func (n *lushrInstruction) Execute(t *Thread) error {
 }
 
 func (n *iandInstruction) Execute(t *Thread) error {
-	// TODO (next): Continue implementing, with iand.
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(a & b)
 }
 
 func (n *landInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Long(t.Stack)
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(a & b)
 }
 
 func (n *iorInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(a | b)
 }
 
 func (n *lorInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Long(t.Stack)
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(a | b)
 }
 
 func (n *ixorInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(a ^ b)
 }
 
 func (n *lxorInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Long(t.Stack)
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(a ^ b)
 }
 
 func (n *iincInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := getLocalInt(t, int(n.index))
+	if e != nil {
+		return e
+	}
+	t.LocalVariables[n.index] = v + Int(n.value)
+	return nil
 }
 
 func (n *i2lInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(Long(v))
 }
 
 func (n *i2fInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushFloat(Float(v))
 }
 
 func (n *i2dInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushDouble(Double(v))
 }
 
 func (n *l2iInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(Int(v))
 }
 
 func (n *l2fInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushFloat(Float(v))
 }
 
 func (n *l2dInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushDouble(Double(v))
 }
 
 func (n *f2iInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(Int(v))
 }
 
 func (n *f2lInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(Long(v))
 }
 
 func (n *f2dInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushDouble(Double(v))
 }
 
 func (n *d2iInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(Int(v))
 }
 
 func (n *d2lInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(Long(v))
 }
 
 func (n *d2fInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushFloat(Float(v))
 }
 
 func (n *i2bInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(Int(Byte(v)))
 }
 
 func (n *i2cInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(Int(Char(v)))
 }
 
 func (n *i2sInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(Int(Short(v)))
 }
 
 func (n *lcmpInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Long(t.Stack)
+	if e != nil {
+		return e
+	}
+	v := Int(0)
+	if b > a {
+		v = 1
+	} else if b < a {
+		v = -1
+	}
+	return t.Stack.Push(v)
 }
 
 func (n *fcmplInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Float(t.Stack)
+	if e != nil {
+		return e
+	}
+	if math.IsNaN(float64(a)) || math.IsNaN(float64(b)) {
+		return t.Stack.Push(-1)
+	}
+	v := Int(0)
+	if b > a {
+		v = 1
+	} else if b < a {
+		v = -1
+	}
+	return t.Stack.Push(v)
 }
 
 func (n *fcmpgInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Float(t.Stack)
+	if e != nil {
+		return e
+	}
+	if math.IsNaN(float64(a)) || math.IsNaN(float64(b)) {
+		return t.Stack.Push(1)
+	}
+	v := Int(0)
+	if b > a {
+		v = 1
+	} else if b < a {
+		v = -1
+	}
+	return t.Stack.Push(v)
 }
 
 func (n *dcmplInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Double(t.Stack)
+	if e != nil {
+		return e
+	}
+	if math.IsNaN(float64(a)) || math.IsNaN(float64(b)) {
+		return t.Stack.Push(-1)
+	}
+	v := Int(0)
+	if b > a {
+		v = 1
+	} else if b < a {
+		v = -1
+	}
+	return t.Stack.Push(v)
 }
 
 func (n *dcmpgInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Double(t.Stack)
+	if e != nil {
+		return e
+	}
+	if math.IsNaN(float64(a)) || math.IsNaN(float64(b)) {
+		return t.Stack.Push(1)
+	}
+	v := Int(0)
+	if b > a {
+		v = 1
+	} else if b < a {
+		v = -1
+	}
+	return t.Stack.Push(v)
 }
 
 func (n *ifeqInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	if v == 0 {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *ifneInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	if v != 0 {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *ifltInstruction) Execute(t *Thread) error {
+	// TODO (next): Implement iflt instruction, including Optimize(...)
 	return NotImplementedError
 }
 

@@ -88,3 +88,42 @@ func (n *ldc2_wInstruction) Optimize(m *Method, offset uint,
 	}
 	return nil
 }
+
+// Takes an instruction's offset and a signed offset relative to the
+// instruction, and returns the index of the instruction at the relative
+// offset. Returns an appropriate error if one occurs, e.g., if the offset
+// doesn't correspond to the start of an instruction.
+func getRelativeIndex(startOffset uint, relativeOffset int64,
+	instructionIndices map[uint]int) (int, error) {
+	newOffset := int64(startOffset) + relativeOffset
+	if newOffset < 0 {
+		return 0, InvalidAddressError(newOffset)
+	}
+	nextIndex, ok := instructionIndices[uint(newOffset)]
+	if !ok {
+		return 0, InvalidAddressError(newOffset)
+	}
+	return nextIndex, nil
+}
+
+func (n *ifeqInstruction) Optimize(m *Method, offset uint,
+	instructionIndices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)),
+		instructionIndices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = uint(nextIndex)
+	return nil
+}
+
+func (n *ifneInstruction) Optimize(m *Method, offset uint,
+	instructionIndices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)),
+		instructionIndices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = uint(nextIndex)
+	return nil
+}

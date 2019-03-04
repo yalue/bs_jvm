@@ -18,6 +18,8 @@ type Thread struct {
 	ParentJVM *JVM
 	// The index of the current instruction in the method.
 	InstructionIndex uint
+	// This will be true if the last executed instruction performed a branch.
+	WasBranch bool
 	// The stack for this thread
 	Stack ThreadStack
 	// The list of local variables, starting with arguments.
@@ -54,8 +56,14 @@ func (t *Thread) Run() error {
 					t.InstructionIndex)
 				break
 			}
+			t.WasBranch = false
 			n = t.CurrentMethod.Instructions[t.InstructionIndex]
 			e = n.Execute(t)
+			if !t.WasBranch {
+				// Go to the next instruction in the sequence if we didn't
+				// encounter a branch.
+				t.InstructionIndex++
+			}
 		}
 		t.ThreadExitReason = e
 		t.threadComplete <- e
