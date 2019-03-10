@@ -18,6 +18,7 @@ type Instruction interface {
 	// instruction's offset (in bytes) into the method code, and a map of
 	// instruction offsets to instruction indices. This must be called during
 	// an optimization pass before execution.
+	// TODO: Make instructionIndices a map[uint]uint instead.
 	Optimize(m *Method, offset uint, instructionIndices map[uint]int) error
 	// Runs the instruction in the given thread
 	Execute(t *Thread) error
@@ -2268,7 +2269,10 @@ func parseIfneInstruction(opcode uint8, name string, address uint,
 	return &ifneInstruction{*toReturn, 0}, nil
 }
 
-type ifltInstruction struct{ twoByteArgumentInstruction }
+type ifltInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIfltInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2276,10 +2280,13 @@ func parseIfltInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &ifltInstruction{*toReturn}, nil
+	return &ifltInstruction{*toReturn, 0}, nil
 }
 
-type ifgeInstruction struct{ twoByteArgumentInstruction }
+type ifgeInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIfgeInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2287,10 +2294,13 @@ func parseIfgeInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &ifgeInstruction{*toReturn}, nil
+	return &ifgeInstruction{*toReturn, 0}, nil
 }
 
-type ifgtInstruction struct{ twoByteArgumentInstruction }
+type ifgtInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIfgtInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2298,10 +2308,13 @@ func parseIfgtInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &ifgtInstruction{*toReturn}, nil
+	return &ifgtInstruction{*toReturn, 0}, nil
 }
 
-type ifleInstruction struct{ twoByteArgumentInstruction }
+type ifleInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIfleInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2309,10 +2322,13 @@ func parseIfleInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &ifleInstruction{*toReturn}, nil
+	return &ifleInstruction{*toReturn, 0}, nil
 }
 
-type if_icmpeqInstruction struct{ twoByteArgumentInstruction }
+type if_icmpeqInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIf_icmpeqInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2320,10 +2336,13 @@ func parseIf_icmpeqInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &if_icmpeqInstruction{*toReturn}, nil
+	return &if_icmpeqInstruction{*toReturn, 0}, nil
 }
 
-type if_icmpneInstruction struct{ twoByteArgumentInstruction }
+type if_icmpneInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIf_icmpneInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2331,10 +2350,13 @@ func parseIf_icmpneInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &if_icmpneInstruction{*toReturn}, nil
+	return &if_icmpneInstruction{*toReturn, 0}, nil
 }
 
-type if_icmpltInstruction struct{ twoByteArgumentInstruction }
+type if_icmpltInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIf_icmpltInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2342,10 +2364,13 @@ func parseIf_icmpltInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &if_icmpltInstruction{*toReturn}, nil
+	return &if_icmpltInstruction{*toReturn, 0}, nil
 }
 
-type if_icmpgeInstruction struct{ twoByteArgumentInstruction }
+type if_icmpgeInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIf_icmpgeInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2353,10 +2378,13 @@ func parseIf_icmpgeInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &if_icmpgeInstruction{*toReturn}, nil
+	return &if_icmpgeInstruction{*toReturn, 0}, nil
 }
 
-type if_icmpgtInstruction struct{ twoByteArgumentInstruction }
+type if_icmpgtInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIf_icmpgtInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2364,10 +2392,13 @@ func parseIf_icmpgtInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &if_icmpgtInstruction{*toReturn}, nil
+	return &if_icmpgtInstruction{*toReturn, 0}, nil
 }
 
-type if_icmpleInstruction struct{ twoByteArgumentInstruction }
+type if_icmpleInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIf_icmpleInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2375,10 +2406,13 @@ func parseIf_icmpleInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &if_icmpleInstruction{*toReturn}, nil
+	return &if_icmpleInstruction{*toReturn, 0}, nil
 }
 
-type if_acmpeqInstruction struct{ twoByteArgumentInstruction }
+type if_acmpeqInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIf_acmpeqInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2386,10 +2420,13 @@ func parseIf_acmpeqInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &if_acmpeqInstruction{*toReturn}, nil
+	return &if_acmpeqInstruction{*toReturn, 0}, nil
 }
 
-type if_acmpneInstruction struct{ twoByteArgumentInstruction }
+type if_acmpneInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseIf_acmpneInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2397,10 +2434,13 @@ func parseIf_acmpneInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &if_acmpneInstruction{*toReturn}, nil
+	return &if_acmpneInstruction{*toReturn, 0}, nil
 }
 
-type gotoInstruction struct{ twoByteArgumentInstruction }
+type gotoInstruction struct {
+	twoByteArgumentInstruction
+	nextIndex uint
+}
 
 func parseGotoInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2408,10 +2448,16 @@ func parseGotoInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &gotoInstruction{*toReturn}, nil
+	return &gotoInstruction{*toReturn, 0}, nil
 }
 
-type jsrInstruction struct{ twoByteArgumentInstruction }
+type jsrInstruction struct {
+	twoByteArgumentInstruction
+	// This is the instruction index of the subroutine start.
+	nextIndex uint
+	// Our "return address" type is an instruction *index*, not a byte offset.
+	returnIndex int
+}
 
 func parseJsrInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2419,7 +2465,7 @@ func parseJsrInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &jsrInstruction{*toReturn}, nil
+	return &jsrInstruction{*toReturn, 0, 0}, nil
 }
 
 type retInstruction struct{ singleByteArgumentInstruction }
@@ -2440,9 +2486,13 @@ type tableswitchInstruction struct {
 	// aligned. It will contain at most 3 bytes.
 	skippedCount  uint8
 	defaultOffset uint32
-	lowOffset     uint32
-	highOffset    uint32
+	lowIndex      uint32
+	highIndex     uint32
 	offsets       []uint32
+	// The same as defaultOffset and offsets, but converted to instruction
+	// indices within the current method.
+	defaultIndex uint
+	indices      []uint
 }
 
 func (n *tableswitchInstruction) Raw() uint8 {
@@ -2455,11 +2505,6 @@ func (n *tableswitchInstruction) Length() uint {
 	// This is called by OtherBytes() to allocate a buffer, so it must not
 	// depend on OtherBytes().
 	return uint(n.skippedCount) + uint(len(n.offsets)*4) + 13
-}
-
-func (n *tableswitchInstruction) Optimize(m *Method, offset uint,
-	instructionIndices map[uint]int) error {
-	return nil
 }
 
 func (n *tableswitchInstruction) OtherBytes() []byte {
@@ -2479,8 +2524,8 @@ func (n *tableswitchInstruction) OtherBytes() []byte {
 		toReturn[offset] = 0
 		offset++
 	}
-	writeValueToBuffer(n.highOffset)
-	writeValueToBuffer(n.lowOffset)
+	writeValueToBuffer(n.highIndex)
+	writeValueToBuffer(n.lowIndex)
 	writeValueToBuffer(n.defaultOffset)
 	for _, v := range n.offsets {
 		writeValueToBuffer(v)
@@ -2490,7 +2535,7 @@ func (n *tableswitchInstruction) OtherBytes() []byte {
 
 func (n *tableswitchInstruction) String() string {
 	return fmt.Sprintf("tableswitch 0x%08x-0x%08x (default 0x%08x)",
-		n.lowOffset, n.highOffset, n.defaultOffset)
+		n.lowIndex, n.highIndex, n.defaultOffset)
 }
 
 func parseTableswitchInstruction(opcode uint8, name string, address uint,
@@ -2506,20 +2551,20 @@ func parseTableswitchInstruction(opcode uint8, name string, address uint,
 		return nil, fmt.Errorf("Failed reading tableswitch default: %s", e)
 	}
 	currentOffset += 4
-	toReturn.lowOffset, e = Read32Bits(m, currentOffset)
+	toReturn.lowIndex, e = Read32Bits(m, currentOffset)
 	if e != nil {
 		return nil, fmt.Errorf("Failed reading tableswitch low offset: %s", e)
 	}
 	currentOffset += 4
-	toReturn.highOffset, e = Read32Bits(m, currentOffset)
+	toReturn.highIndex, e = Read32Bits(m, currentOffset)
 	if e != nil {
 		return nil, fmt.Errorf("Failed reading tableswitch high offset: %s", e)
 	}
 	currentOffset += 4
-	if toReturn.highOffset < toReturn.lowOffset {
+	if toReturn.highIndex < toReturn.lowIndex {
 		return nil, fmt.Errorf("Tableswitch offset range invalid")
 	}
-	offsetsCount := toReturn.highOffset - toReturn.lowOffset + 1
+	offsetsCount := toReturn.highIndex - toReturn.lowIndex + 1
 	toReturn.offsets = make([]uint32, offsetsCount)
 	for i := range toReturn.offsets {
 		toReturn.offsets[i], e = Read32Bits(m, currentOffset)
@@ -2543,6 +2588,10 @@ type lookupswitchInstruction struct {
 	skippedBytes  []byte
 	defaultOffset uint32
 	pairs         []lookupswitchPair
+	// Holds instruction indices rather than offsets. The indices array is in
+	// the same order as the pairs array, but doesn't contain the value.
+	defaultIndex uint
+	indices []uint
 }
 
 func (n *lookupswitchInstruction) Raw() uint8 {
@@ -2551,11 +2600,6 @@ func (n *lookupswitchInstruction) Raw() uint8 {
 
 func (n *lookupswitchInstruction) Length() uint {
 	return uint(len(n.skippedBytes)) + uint(len(n.pairs)*8) + 9
-}
-
-func (n *lookupswitchInstruction) Optimize(m *Method, offset uint,
-	instructionIndices map[uint]int) error {
-	return nil
 }
 
 func (n *lookupswitchInstruction) OtherBytes() []byte {

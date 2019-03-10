@@ -94,7 +94,7 @@ func (n *ldc2_wInstruction) Optimize(m *Method, offset uint,
 // offset. Returns an appropriate error if one occurs, e.g., if the offset
 // doesn't correspond to the start of an instruction.
 func getRelativeIndex(startOffset uint, relativeOffset int64,
-	instructionIndices map[uint]int) (int, error) {
+	instructionIndices map[uint]int) (uint, error) {
 	newOffset := int64(startOffset) + relativeOffset
 	if newOffset < 0 {
 		return 0, InvalidAddressError(newOffset)
@@ -103,7 +103,7 @@ func getRelativeIndex(startOffset uint, relativeOffset int64,
 	if !ok {
 		return 0, InvalidAddressError(newOffset)
 	}
-	return nextIndex, nil
+	return uint(nextIndex), nil
 }
 
 func (n *ifeqInstruction) Optimize(m *Method, offset uint,
@@ -113,7 +113,7 @@ func (n *ifeqInstruction) Optimize(m *Method, offset uint,
 	if e != nil {
 		return e
 	}
-	n.nextIndex = uint(nextIndex)
+	n.nextIndex = nextIndex
 	return nil
 }
 
@@ -124,6 +124,187 @@ func (n *ifneInstruction) Optimize(m *Method, offset uint,
 	if e != nil {
 		return e
 	}
-	n.nextIndex = uint(nextIndex)
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *ifltInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *ifgeInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *ifgtInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *ifleInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *if_icmpeqInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *if_icmpneInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *if_icmpltInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *if_icmpgeInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *if_icmpgtInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *if_icmpleInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *if_acmpeqInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *if_acmpneInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *gotoInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	return nil
+}
+
+func (n *jsrInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	nextIndex, e := getRelativeIndex(offset, int64(int16(n.value)), indices)
+	if e != nil {
+		return e
+	}
+	n.nextIndex = nextIndex
+	// If the return address is somehow invalid, we'll just catch it at
+	// runtime whenever the subroutine returns.
+	n.returnIndex = indices[offset] + 1
+	return nil
+}
+
+func (n *tableswitchInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	var e error
+	n.defaultIndex, e = getRelativeIndex(offset, int64(int32(n.defaultOffset)),
+		indices)
+	if e != nil {
+		return e
+	}
+	n.indices = make([]uint, len(n.offsets))
+	for i := range n.indices {
+		n.indices[i], e = getRelativeIndex(offset, int64(int32(n.offsets[i])),
+			indices)
+		if e != nil {
+			return e
+		}
+	}
+	return nil
+}
+
+func (n *lookupswitchInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	var e error
+	n.defaultIndex, e = getRelativeIndex(offset, int64(int32(n.defaultOffset)),
+		indices)
+	if e != nil {
+		return e
+	}
+	n.indices = make([]uint, len(n.pairs))
+	for i := range n.pairs {
+		n.indices[i], e = getRelativeIndex(offset,
+			int64(int32(n.pairs[i].offset)), indices)
+		if e != nil {
+			return e
+		}
+	}
 	return nil
 }

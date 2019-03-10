@@ -234,6 +234,7 @@ func (j *JVM) NewMethod(class *Class, index int) (*Method, error) {
 			return nil, fmt.Errorf("Error in optimization pass over %s: %s",
 				instruction, e)
 		}
+		address += instruction.Length()
 	}
 	return &toReturn, nil
 }

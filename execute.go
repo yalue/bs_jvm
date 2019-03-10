@@ -3,6 +3,7 @@ package bs_jvm
 import (
 	"fmt"
 	"math"
+	"sort"
 )
 
 // This file contains functions for executing individual JVM instructions.
@@ -1550,75 +1551,220 @@ func (n *ifneInstruction) Execute(t *Thread) error {
 }
 
 func (n *ifltInstruction) Execute(t *Thread) error {
-	// TODO (next): Implement iflt instruction, including Optimize(...)
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	if v < 0 {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *ifgeInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	if v >= 0 {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *ifgtInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	if v > 0 {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *ifleInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	if v <= 0 {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *if_icmpeqInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	if a == b {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *if_icmpneInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	if a != b {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *if_icmpltInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	if b < a {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *if_icmpgeInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	if b >= a {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *if_icmpgtInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	if b > a {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *if_icmpleInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, b, e := pop2Int(t.Stack)
+	if e != nil {
+		return e
+	}
+	if b <= a {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *if_acmpeqInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopRef()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopRef()
+	if e != nil {
+		return e
+	}
+	if a == b {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *if_acmpneInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	a, e := t.Stack.PopRef()
+	if e != nil {
+		return e
+	}
+	b, e := t.Stack.PopRef()
+	if e != nil {
+		return e
+	}
+	if a != b {
+		t.InstructionIndex = n.nextIndex
+		t.WasBranch = true
+	}
+	return nil
 }
 
 func (n *gotoInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	t.InstructionIndex = n.nextIndex
+	t.WasBranch = true
+	return nil
 }
 
 func (n *jsrInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	e := t.Stack.Push(Int(n.returnIndex))
+	if e != nil {
+		return e
+	}
+	t.InstructionIndex = n.nextIndex
+	t.WasBranch = true
+	return nil
 }
 
 func (n *retInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	// Remember that our "return address" type is an int corresponding to an
+	// instruction *index*.
+	returnIndex, e := getLocalInt(t, int(n.value))
+	if e != nil {
+		return e
+	}
+	t.InstructionIndex = uint(returnIndex)
+	t.WasBranch = true
+	return nil
 }
 
 func (n *tableswitchInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	if (uint32(v) < n.lowIndex) || (uint32(v) > n.highIndex) {
+		t.InstructionIndex = n.defaultIndex
+		t.WasBranch = true
+		return nil
+	}
+	t.InstructionIndex = n.indices[uint32(v)-n.lowIndex]
+	t.WasBranch = true
+	return nil
 }
 
 func (n *lookupswitchInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	i := sort.Search(len(n.pairs), func(i int) bool {
+		return int32(v) >= n.pairs[i].match
+	})
+	if (i >= len(n.pairs)) || (n.pairs[i].match != int32(v)) {
+		t.InstructionIndex = n.defaultIndex
+		t.WasBranch = true
+		return nil
+	}
+	t.InstructionIndex = n.indices[i]
+	t.WasBranch = true
+	return nil
 }
 
 func (n *ireturnInstruction) Execute(t *Thread) error {
+	// TODO (next): Implement ireturnInstruction.
 	return NotImplementedError
 }
 
