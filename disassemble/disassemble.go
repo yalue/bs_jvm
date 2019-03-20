@@ -29,7 +29,8 @@ func run() int {
 	class := jvm.Classes[className]
 	for name, method := range class.Methods {
 		offset = 0
-		fmt.Printf("  Method %s:\n", name)
+		fmt.Printf("  Method %s %s(%s):\n", method.Types.ReturnString(), name,
+			method.Types.ArgumentsString())
 		for _, n := range method.Instructions {
 			fmt.Printf("    0x%08x %s\n", offset, n)
 			offset += n.Length()

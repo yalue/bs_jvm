@@ -84,7 +84,7 @@ func TestParseCodeAttributes(t *testing.T) {
 			t.Logf("Failed parsing code attribute: %s\n", e)
 			t.FailNow()
 		}
-		t.Logf("Attributes for %s's code:\n", m)
+		t.Logf("Attributes for %s's code:\n", m.Name)
 		for _, a := range parsedCodeAttribute.Attributes {
 			t.Logf("  %s\n", a.Name)
 		}

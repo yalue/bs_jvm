@@ -2,6 +2,7 @@ package bs_jvm
 
 import (
 	"fmt"
+	"github.com/yalue/bs_jvm/class_file"
 	"math"
 	"sort"
 )
@@ -1764,15 +1765,50 @@ func (n *lookupswitchInstruction) Execute(t *Thread) error {
 }
 
 func (n *ireturnInstruction) Execute(t *Thread) error {
-	// TODO (next): Implement ireturnInstruction.
-	return NotImplementedError
+	returnValue, e := t.Stack.Pop()
+	if e != nil {
+		return e
+	}
+	// We should have already checked that this type is OK during the optimize
+	// pass.
+	r := t.CurrentMethod.Types.ReturnType.(class_file.PrimitiveFieldType)
+	// Convert the value popped off the stack if the return value of the method
+	// is something shorter, such as a byte, char, boolean, or short.
+	switch r {
+	case 'B':
+		returnValue &= 0xff
+	case 'C':
+		returnValue = Int(Char(returnValue))
+	case 'S':
+		returnValue = Int(Short(returnValue))
+	case 'Z':
+		// This is how the JVM spec requires converting an int to a boolean.
+		returnValue &= 1
+	}
+	// This may return a ThreadExitedError if this was the initial method in
+	// a thread.
+	e = t.Return()
+	if e != nil {
+		return e
+	}
+	return t.Stack.Push(returnValue)
 }
 
 func (n *lreturnInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	returnValue, e := t.Stack.PopLong()
+	if e != nil {
+		return e
+	}
+	// Optimize() already should have verified that this method returns a long.
+	e = t.Return()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushLong(returnValue)
 }
 
 func (n *freturnInstruction) Execute(t *Thread) error {
+	// TODO (next): Implement freturn
 	return NotImplementedError
 }
 

@@ -51,14 +51,14 @@ type Field struct {
 	Access FieldAccessFlags
 	// The UTF-8 string containing the field's name
 	Name []byte
-	// The UTF-8 string containing the field's descriptor (type)
-	Descriptor []byte
+	// Contains the type of the field.
+	Descriptor FieldType
 	// A table of attributes for this specific field
 	Attributes []*Attribute
 }
 
 func (f *Field) String() string {
-	return fmt.Sprintf("%s field, name %s, descriptor %s, %d attributes",
+	return fmt.Sprintf("%s field, name %s, type %s, %d attributes",
 		f.Access, f.Name, f.Descriptor, len(f.Attributes))
 }
 
@@ -82,9 +82,14 @@ func (c *Class) parseSingleField(data io.Reader) (*Field, error) {
 	if e != nil {
 		return nil, fmt.Errorf("Failed reading field descriptor index: %s", e)
 	}
-	toReturn.Descriptor, e = c.GetUTF8Constant(index)
+	descriptorBytes, e := c.GetUTF8Constant(index)
 	if e != nil {
-		return nil, fmt.Errorf("Invalid field descriptor: %s", e)
+		return nil, fmt.Errorf("Couldn't get field descriptor string: %s", e)
+	}
+	toReturn.Descriptor, e = ParseFieldType(descriptorBytes)
+	if e != nil {
+		return nil, fmt.Errorf("Error getting type for field %s: %s",
+			toReturn.Name, e)
 	}
 	var attributeCount uint16
 	e = binary.Read(data, binary.BigEndian, &attributeCount)

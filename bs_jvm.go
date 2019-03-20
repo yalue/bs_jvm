@@ -146,7 +146,7 @@ func (t *Thread) Return() error {
 	returnInfo, e := t.Stack.PopFrame()
 	if e == StackEmptyError {
 		t.EndThread(ThreadExitedError)
-		return nil
+		return ThreadExitedError
 	}
 	if e != nil {
 		return e
@@ -177,6 +177,8 @@ func NewJVM() *JVM {
 type Method struct {
 	// The class in which the method was defined.
 	ContainingClass *Class
+	// The argument and return types of the method.
+	Types *class_file.MethodDescriptor
 	// Contains all parsed functions in the method.
 	Instructions []Instruction
 }
@@ -210,6 +212,7 @@ func (j *JVM) NewMethod(class *Class, index int) (*Method, error) {
 	}
 	toReturn := Method{
 		ContainingClass: class,
+		Types:           method.Descriptor,
 		Instructions:    make([]Instruction, instructionCount),
 	}
 	address = 0

@@ -9,12 +9,13 @@ import (
 )
 
 // Converts a constant to a value that can be pushed by ldc or ldc_w. Returns
-// the primitive value or reference to push. The constant is a primitive if and
-// only if the returned Object is nil.
-func constantToLdcInfo(class *Class, c class_file.Constant) (Int, Object,
+// the primitive value or reference to push. Returns true if the returned value
+// is a primitive.
+func constantToLdcInfo(class *Class, c class_file.Constant) (Int, Object, bool,
 	error) {
 	var primitive Int
 	var reference Object = nil
+	isPrimitive := false
 	var e error
 	// Primitive types can be converted now, but references to other objects
 	// can be handled later--for now just read them from the class file.
@@ -22,20 +23,23 @@ func constantToLdcInfo(class *Class, c class_file.Constant) (Int, Object,
 	case *class_file.ConstantIntegerInfo:
 		primitive = Int(v.Value)
 		reference = Int(v.Value)
+		isPrimitive = true
 	case *class_file.ConstantFloatInfo:
 		primitive = Int(math.Float32bits(v.Value))
 		reference = Float(v.Value)
+		isPrimitive = true
 	case *class_file.ConstantStringInfo, *class_file.ConstantMethodHandleInfo,
 		*class_file.ConstantMethodTypeInfo, *class_file.ConstantClassInfo:
 		reference, e = ConvertConstantToObject(class, c)
 		if e != nil {
-			return 0, nil, e
+			return 0, nil, false, e
 		}
 	default:
 		// ldc only allows the types of constants listed above.
-		return 0, nil, TypeError(fmt.Sprintf("Invalid ldc constant: %s", c))
+		return 0, nil, false, TypeError(fmt.Sprintf("Invalid ldc constant: %s",
+			c))
 	}
-	return primitive, reference, nil
+	return primitive, reference, isPrimitive, nil
 }
 
 func (n *ldcInstruction) Optimize(m *Method, offset uint,
@@ -44,11 +48,12 @@ func (n *ldcInstruction) Optimize(m *Method, offset uint,
 	if e != nil {
 		return e
 	}
-	primitive, reference, e := constantToLdcInfo(m.ContainingClass, constant)
+	primitive, reference, isPrimitive, e := constantToLdcInfo(
+		m.ContainingClass, constant)
 	if e != nil {
 		return e
 	}
-	n.isPrimitive = reference == nil
+	n.isPrimitive = isPrimitive
 	n.primitiveValue = primitive
 	n.reference = reference
 	return nil
@@ -60,11 +65,12 @@ func (n *ldc_wInstruction) Optimize(m *Method, offset uint,
 	if e != nil {
 		return e
 	}
-	primitive, reference, e := constantToLdcInfo(m.ContainingClass, constant)
+	primitive, reference, isPrimitive, e := constantToLdcInfo(
+		m.ContainingClass, constant)
 	if e != nil {
 		return e
 	}
-	n.isPrimitive = reference == nil
+	n.isPrimitive = isPrimitive
 	n.primitiveValue = primitive
 	n.reference = reference
 	return nil
@@ -307,4 +313,37 @@ func (n *lookupswitchInstruction) Optimize(m *Method, offset uint,
 		}
 	}
 	return nil
+}
+
+// This just lets us type-check the method's return type during the optimize
+// pass rather than at runtime.
+func (n *ireturnInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	t, ok := m.Types.ReturnType.(class_file.PrimitiveFieldType)
+	if !ok {
+		return TypeError("Encountered ireturn in a function that doesn't " +
+			"return a primitive")
+	}
+	switch t {
+	case 'Z', 'B', 'C', 'S', 'I':
+		return nil
+	}
+	return TypeError(fmt.Sprintf("Encountered ireturn in a function that "+
+		"returns a %s", t.String()))
+}
+
+// Similar to ireturn's Optimize(...), this just makes sure that the lreturn
+// is being called from a method that actually returns a long.
+func (n *lreturnInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	t, ok := m.Types.ReturnType.(class_file.PrimitiveFieldType)
+	if !ok {
+		return TypeError("Encountered lreturn in a function that doesn't " +
+			"return a primitive")
+	}
+	if t == 'J' {
+		return nil
+	}
+	return TypeError(fmt.Sprintf("Encountered lreturn in a function that "+
+		"returns a %s", t.String()))
 }

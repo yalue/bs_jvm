@@ -61,15 +61,16 @@ type Method struct {
 	Access MethodAccessFlags
 	// The UTF-8 string containing the method's name
 	Name []byte
-	// The UTF-8 constant containing the method's descriptor (type)
-	Descriptor []byte
+	// Contains information about the method's arguments and return type.
+	Descriptor *MethodDescriptor
 	// A table of attributes for this specific method
 	Attributes []*Attribute
 }
 
 func (m *Method) String() string {
-	return fmt.Sprintf("%s method, name %s, descriptor %s, %d attribute(s)",
-		m.Access, m.Name, m.Descriptor, len(m.Attributes))
+	return fmt.Sprintf("%s %s %s(%s), %d attribute(s)", m.Access,
+		m.Descriptor.ReturnString(), m.Name, m.Descriptor.ArgumentsString(),
+		len(m.Attributes))
 }
 
 // Returns this method's code attribute, which must exist by the JVM spec.
@@ -117,9 +118,14 @@ func (c *Class) parseSingleMethod(data io.Reader) (*Method, error) {
 	if e != nil {
 		return nil, fmt.Errorf("Failed reading method descriptor index: %s", e)
 	}
-	toReturn.Descriptor, e = c.GetUTF8Constant(index)
+	descriptorBytes, e := c.GetUTF8Constant(index)
 	if e != nil {
-		return nil, fmt.Errorf("Invalid method descriptor: %s", e)
+		return nil, fmt.Errorf("Couldn't get method descriptor string: %s", e)
+	}
+	toReturn.Descriptor, e = ParseMethodDescriptor(descriptorBytes)
+	if e != nil {
+		return nil, fmt.Errorf("Bad descriptor for method %s: %s",
+			toReturn.Name, e)
 	}
 	var attributeCount uint16
 	e = binary.Read(data, binary.BigEndian, &attributeCount)
