@@ -347,3 +347,48 @@ func (n *lreturnInstruction) Optimize(m *Method, offset uint,
 	return TypeError(fmt.Sprintf("Encountered lreturn in a function that "+
 		"returns a %s", t.String()))
 }
+
+// Similar to ireturn's Optimize(...), this just checks that a method using
+// an freturn instruction is supposed to return a float.
+func (n *freturnInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	t, ok := m.Types.ReturnType.(class_file.PrimitiveFieldType)
+	if !ok {
+		return TypeError("Encountered freturn in a function that doesn't " +
+			"return a primitive")
+	}
+	if t == 'F' {
+		return nil
+	}
+	return TypeError(fmt.Sprintf("Encountered freturn in a function that "+
+		"returns a %s", t.String()))
+}
+
+// Similar to ireturn's Optimize(...), this just checks that a method using
+// a dreturn instruction is supposed to return a double.
+func (n *dreturnInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	t, ok := m.Types.ReturnType.(class_file.PrimitiveFieldType)
+	if !ok {
+		return TypeError("Encountered dreturn in a function that doesn't " +
+			"return a primitive")
+	}
+	if t == 'D' {
+		return nil
+	}
+	return TypeError(fmt.Sprintf("Encountered dreturn in a function that "+
+		"returns a %s", t.String()))
+}
+
+// Similar to ireturn's Optimize(...) but checks that a method using areturn
+// actually returns a reference rather than a primitive.
+func (n *areturnInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	// Only arrays and object references should be returned using areturn.
+	switch m.Types.ReturnType.(type) {
+	case class_file.ClassInstanceType, *class_file.ArrayType:
+		return nil
+	}
+	return TypeError(fmt.Sprintf("Encountered areturn in a function that "+
+		"returns a %s", m.Types.ReturnType.String()))
+}

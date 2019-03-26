@@ -1808,19 +1808,48 @@ func (n *lreturnInstruction) Execute(t *Thread) error {
 }
 
 func (n *freturnInstruction) Execute(t *Thread) error {
-	// TODO (next): Implement freturn
-	return NotImplementedError
+	returnValue, e := t.Stack.PopFloat()
+	if e != nil {
+		return e
+	}
+	// The expected return type was already checked by Optimize()
+	e = t.Return()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushFloat(returnValue)
 }
 
 func (n *dreturnInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	returnValue, e := t.Stack.PopDouble()
+	if e != nil {
+		return e
+	}
+	// The expected return type was already checked by Optimize()
+	e = t.Return()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushDouble(returnValue)
 }
 
 func (n *areturnInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	returnValue, e := t.Stack.PopRef()
+	if e != nil {
+		return e
+	}
+	// The expected return type was already (somewhat) checked by Optimize()
+	// NOTE: Should we verify the returned type is what we expect here? I.e.,
+	// make sure class names and/or array dimensions match up?
+	e = t.Return()
+	if e != nil {
+		return e
+	}
+	return t.Stack.PushRef(returnValue)
 }
 
 func (n *returnInstruction) Execute(t *Thread) error {
+	// TODO (next): Implement returnInstruction.Execute
 	return NotImplementedError
 }
 
