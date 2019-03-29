@@ -1849,11 +1849,11 @@ func (n *areturnInstruction) Execute(t *Thread) error {
 }
 
 func (n *returnInstruction) Execute(t *Thread) error {
-	// TODO (next): Implement returnInstruction.Execute
-	return NotImplementedError
+	return t.Return()
 }
 
 func (n *getstaticInstruction) Execute(t *Thread) error {
+	// TODO (next): Implement getstaticInstruction.
 	return NotImplementedError
 }
 

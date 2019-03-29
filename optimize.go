@@ -392,3 +392,15 @@ func (n *areturnInstruction) Optimize(m *Method, offset uint,
 	return TypeError(fmt.Sprintf("Encountered areturn in a function that "+
 		"returns a %s", m.Types.ReturnType.String()))
 }
+
+// Similar to the Optimize(...) functions for other return instructions-- but
+// in this case just ensures the method has a return type of void.
+func (n *returnInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	t, ok := m.Types.ReturnType.(class_file.PrimitiveFieldType)
+	if !ok || (t != 'V') {
+		return TypeError("Encountered a return instruction in a function that" +
+			" doesn't return void")
+	}
+	return nil
+}
