@@ -5,7 +5,7 @@ package bs_jvm
 
 // Takes an opcode, the instruction name, the address of the opcode, and a
 // Memory, then returns an Instruction object.
-type parserFunction func(uint8, string, uint, Memory) (Instruction,	error)
+type parserFunction func(uint8, string, uint, Memory) (Instruction, error)
 
 // Metadata to assist in parsing opcodes
 type jvmOpcodeInfo struct {

@@ -2591,7 +2591,7 @@ type lookupswitchInstruction struct {
 	// Holds instruction indices rather than offsets. The indices array is in
 	// the same order as the pairs array, but doesn't contain the value.
 	defaultIndex uint
-	indices []uint
+	indices      []uint
 }
 
 func (n *lookupswitchInstruction) Raw() uint8 {
@@ -2770,7 +2770,13 @@ func parseReturnInstruction(opcode uint8, name string, address uint,
 	return &toReturn, nil
 }
 
-type getstaticInstruction struct{ twoByteArgumentInstruction }
+type getstaticInstruction struct {
+	twoByteArgumentInstruction
+	// The class containing the static field to be accessed.
+	class *Class
+	// The index into the class' StaticFieldValues array.
+	index int
+}
 
 func parseGetstaticInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2778,10 +2784,16 @@ func parseGetstaticInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &getstaticInstruction{*toReturn}, nil
+	return &getstaticInstruction{*toReturn, nil, 0}, nil
 }
 
-type putstaticInstruction struct{ twoByteArgumentInstruction }
+type putstaticInstruction struct {
+	twoByteArgumentInstruction
+	// The class containing the static field to be accessed.
+	class *Class
+	// The index into the class' StaticFieldValues array.
+	index int
+}
 
 func parsePutstaticInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2789,7 +2801,7 @@ func parsePutstaticInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &putstaticInstruction{*toReturn}, nil
+	return &putstaticInstruction{*toReturn, nil, 0}, nil
 }
 
 type getfieldInstruction struct{ twoByteArgumentInstruction }
@@ -2876,7 +2888,7 @@ func parseInvokeinterfaceInstruction(opcode uint8, name string, address uint,
 	}
 	toReturn := invokeinterfaceInstruction{
 		twoByteArgumentInstruction: *tmp,
-		count: count,
+		count:                      count,
 	}
 	return &toReturn, nil
 }

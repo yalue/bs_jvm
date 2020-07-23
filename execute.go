@@ -1853,12 +1853,59 @@ func (n *returnInstruction) Execute(t *Thread) error {
 }
 
 func (n *getstaticInstruction) Execute(t *Thread) error {
-	// TODO (next): Implement getstaticInstruction.
-	return NotImplementedError
+	v := n.class.StaticFieldValues[n.index]
+	return t.Stack.PushUnconditional(v)
 }
 
 func (n *putstaticInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	// We'll first look up the type that's stored in the field in order to pop
+	// the right type from the stack.
+	targetValue := n.class.StaticFieldValues[n.index]
+
+	// First, if this isn't a primitive it must be a reference, so we'll pop a
+	// reference off the stack and store it.
+	if !targetValue.IsPrimitive() {
+		newValue, e := t.Stack.PopRef()
+		if e != nil {
+			return e
+		}
+		e = AssignmentOK(newValue, targetValue)
+		if e != nil {
+			return TypeError(fmt.Sprintf("Trying to assign incompatible type "+
+				"to static field: %s", e))
+		}
+		n.class.StaticFieldValues[n.index] = newValue
+		return nil
+	}
+
+	// Now that we know the value was a primitive we will need to pop the right
+	// type of primitive off the stack.
+	var newValue PrimitiveType
+	var e error
+
+	// We only care about floats, longs, and doubles. By default, we pop an
+	// int, since that's the smallest integral primitive that can be pushed
+	// onto the stack.
+	switch targetValue.(type) {
+	case Double:
+		newValue, e = t.Stack.PopDouble()
+	case Float:
+		newValue, e = t.Stack.PopFloat()
+	case Long:
+		newValue, e = t.Stack.PopLong()
+	default:
+		newValue, e = t.Stack.Pop()
+	}
+	if e != nil {
+		return e
+	}
+
+	// No matter what we popped from the stack, this will allow us to convert
+	// it to the correct type before storing it.
+	tmp := targetValue.(PrimitiveType)
+	toStore := tmp.ConvertFrom(newValue)
+	n.class.StaticFieldValues[n.index] = toStore
+	return nil
 }
 
 func (n *getfieldInstruction) Execute(t *Thread) error {

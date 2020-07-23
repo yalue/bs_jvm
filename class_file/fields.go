@@ -45,6 +45,11 @@ func (f FieldAccessFlags) String() string {
 	return strings.TrimRight(toReturn, " ")
 }
 
+// Returns true if the access flags indicate that the field is static.
+func (f FieldAccessFlags) IsStatic() bool {
+	return (f & 0x0008) != 0
+}
+
 // Contains information about a single field in the class file.
 type Field struct {
 	// Access permissions and properties, e.g. "public static"

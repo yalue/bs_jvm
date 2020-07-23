@@ -88,11 +88,18 @@ func (e NullReferenceError) Error() string {
 	return fmt.Sprintf("Null reference error: %s", string(e))
 }
 
-
 // This is usually returned if an instruction attempts to do something that
 // requires dividing by zero.
 type ArithmeticError string
 
 func (e ArithmeticError) Error() string {
 	return fmt.Sprintf("Arithmetic error: %s", string(e))
+}
+
+// This type of error is returned if there's an error resolving a field of a
+// class, including a static value.
+type FieldError string
+
+func (e FieldError) Error() string {
+	return fmt.Sprintf("Field error: %s", string(e))
 }

@@ -58,6 +58,7 @@ func (t *Thread) Run() error {
 			}
 			t.WasBranch = false
 			n = t.CurrentMethod.Instructions[t.InstructionIndex]
+			fmt.Sprintf("Running instruction: %s\n", n.String())
 			e = n.Execute(t)
 			if !t.WasBranch {
 				// Go to the next instruction in the sequence if we didn't
@@ -255,6 +256,8 @@ func (j *JVM) LoadClass(class *class_file.Class) error {
 // Returns a reference to the named class. Returns a ClassNotFoundError if the
 // class hasn't been loaded.
 func (j *JVM) GetClass(name string) (*Class, error) {
+	// TODO: Make a GetOrLoadClass function, that can potentially load classes
+	// during the "optimize" pass if they're needed.
 	toReturn := j.Classes[name]
 	if toReturn == nil {
 		return nil, ClassNotFoundError(name)
