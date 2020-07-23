@@ -406,86 +406,53 @@ func (n *returnInstruction) Optimize(m *Method, offset uint,
 }
 
 // Takes a class and an index into that class' constant pool. The index must
-// specify a field info constant (*class_file.ConstantFieldInfo). On success,
-// this returns the name of the class containing the field, and the name of the
-// field, in that order. Otherwise returns an error and empty strings.
-func resolveFieldInfoConstant(currentClass *Class, index uint16) (string,
-	string, error) {
-	// TODO (next): Replace this with some of the code in constant_object.go
-	// Many layers of indirection to dive through here. The "field" is
-	// specified by an index into the class' constants, which must be a
-	// FieldInfo constant.  The FieldInfo constant contains more indices into
-	// the constant pool, including the containing class' name and the field's
-	// name and type (all of this requires a couple more levels of indirection
-	// in the constant pool before they can actually be resolved as strings.)
-	// At least the process is fairly "linear" so you can follow what's being
-	// looked up just be reading the code below.
+// specify a field info constant (*class_file.ConstantFieldInfo). Returns the
+// resolved constant.
+func resolveStaticFieldConstant(currentClass *Class, index uint16) (
+	*FieldOrMethodReference, error) {
 	classFile := currentClass.File
 	constant, e := classFile.GetConstant(index)
 	if e != nil {
-		return "", "", FieldError(fmt.Sprintf("Couldn't get field info "+
+		return nil, FieldError(fmt.Sprintf("Couldn't get field info "+
 			"constant: %s", e))
 	}
-	fieldInfo, ok := constant.(*class_file.ConstantFieldInfo)
+	// We'll do this check here, because ConvertConstantToObject will also work
+	// with a Method constant, which we want to make sure we didn't get.
+	// (Though such a thing should never happen in practice...)
+	_, ok := constant.(*class_file.ConstantFieldInfo)
 	if !ok {
-		return "", "", FieldError(fmt.Sprintf("Expected a field-info "+
-			"constant, got %s", constant))
+		return nil, FieldError(fmt.Sprintf("Didn't get a field info "+
+			"constant, but instead got: %s", constant.String()))
 	}
-	constant, e = classFile.GetConstant(fieldInfo.ClassIndex)
+	tmp, e := ConvertConstantToObject(currentClass, constant)
 	if e != nil {
-		return "", "", FieldError(fmt.Sprintf("Couldn't get field's "+
-			"class-info constant: %s", e))
+		return nil, FieldError(fmt.Sprintf("Error processing field info "+
+			"constant: %s", e))
 	}
-	classInfo, ok := constant.(*class_file.ConstantClassInfo)
+	fieldRef, ok := tmp.(*FieldOrMethodReference)
 	if !ok {
-		return "", "", FieldError(fmt.Sprintf("Expected a class info "+
-			"constant, got %s", constant))
+		return nil, FieldError(fmt.Sprintf("Didn't get expected field "+
+			"reference object, instead got: %s", tmp.String()))
 	}
-	className, e := classFile.GetUTF8Constant(classInfo.NameIndex)
-	if e != nil {
-		return "", "", FieldError(fmt.Sprintf("Failed getting class name: %s",
-			e))
-	}
-	constant, e = classFile.GetConstant(fieldInfo.NameAndTypeIndex)
-	if e != nil {
-		return "", "", FieldError(fmt.Sprintf("Couldn't get field name and "+
-			"type: %s", e))
-	}
-	nameAndType, ok := constant.(*class_file.ConstantNameAndTypeInfo)
-	if !ok {
-		return "", "", FieldError(fmt.Sprintf("Expected a name and type info "+
-			"constant, got %s", constant))
-	}
-	fieldName, e := classFile.GetUTF8Constant(nameAndType.NameIndex)
-	if e != nil {
-		return "", "", FieldError(fmt.Sprintf("Failed getting field name: %s",
-			e))
-	}
-	return string(className), string(fieldName), nil
+	return fieldRef, nil
 }
 
 // Figures out the class and field to get, and makes sure the field is static.
 func (n *getstaticInstruction) Optimize(m *Method, offset uint,
 	indices map[uint]int) error {
-	className, fieldName, e := resolveFieldInfoConstant(m.ContainingClass,
-		n.value)
+	fieldInfo, e := resolveStaticFieldConstant(m.ContainingClass, n.value)
 	if e != nil {
 		return fmt.Errorf("Failed resolving field for getstatic "+
 			"instruction: %s", e)
 	}
-	targetClass, e := m.ContainingClass.ParentJVM.GetClass(className)
-	// TODO: Handle the case where the class may not already be loaded. (Same
-	// for putstatic)
-	if e != nil {
-		return fmt.Errorf("Couldn't find class containing static field: %s", e)
-	}
 	var index int
+	fieldName := string(fieldInfo.Field.Name)
 	// Note that resolving the field may change the target class (if it's
 	// defined in a superclass, for example)
-	targetClass, index, e = targetClass.ResolveStaticField(fieldName)
+	targetClass, index, e := fieldInfo.C.ResolveStaticField(fieldName)
 	if e != nil {
 		return fmt.Errorf("Couldn't resolve static field %s in class %s: %s",
-			fieldName, className, e)
+			fieldName, fieldInfo.C.Name, e)
 	}
 	n.class = targetClass
 	n.index = index
@@ -494,21 +461,18 @@ func (n *getstaticInstruction) Optimize(m *Method, offset uint,
 
 func (n *putstaticInstruction) Optimize(m *Method, offset uint,
 	indices map[uint]int) error {
-	className, fieldName, e := resolveFieldInfoConstant(m.ContainingClass,
-		n.value)
+	// Basically the same as for getstatic.
+	fieldInfo, e := resolveStaticFieldConstant(m.ContainingClass, n.value)
 	if e != nil {
 		return fmt.Errorf("Failed resolving field for putstatic "+
 			"instruction: %s", e)
 	}
-	targetClass, e := m.ContainingClass.ParentJVM.GetClass(className)
-	if e != nil {
-		return fmt.Errorf("Couldn't find class containing static field: %s", e)
-	}
 	var index int
-	targetClass, index, e = targetClass.ResolveStaticField(fieldName)
+	fieldName := string(fieldInfo.Field.Name)
+	targetClass, index, e := fieldInfo.C.ResolveStaticField(fieldName)
 	if e != nil {
 		return fmt.Errorf("Couldn't resolve static field %s in class %s: %s",
-			fieldName, className, e)
+			fieldName, fieldInfo.C.Name, e)
 	}
 	n.class = targetClass
 	n.index = index

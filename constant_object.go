@@ -74,16 +74,22 @@ func ResolveNameAndTypeInfoConstant(class *Class,
 
 // A handle to a field reference constant.
 type FieldOrMethodReference struct {
-	ClassReference *Class
-	Field          *NameAndTypeInfo
+	// The class the constant referred to.
+	C *Class
+	// The name and type of the field or method in the class.
+	Field *NameAndTypeInfo
 }
 
 func (h *FieldOrMethodReference) String() string {
-	return h.ClassReference.String() + ", " + h.Field.String()
+	return h.C.String() + ", " + h.Field.String()
 }
 
 func (h *FieldOrMethodReference) IsPrimitive() bool {
 	return false
+}
+
+func (h *FieldOrMethodReference) TypeName() string {
+	return "field or method reference constant"
 }
 
 type GetFieldMethodHandle struct {
@@ -191,6 +197,8 @@ func convertFieldOrMethodRefConstantToObject(class *Class,
 	if e != nil {
 		return nil, fmt.Errorf("Couldn't get class name for field info: %s", e)
 	}
+	// TODO: May need to "load" classes here if the referenced class isn't
+	// loaded yet.
 	fieldClass, e := class.ParentJVM.GetClass(string(className))
 	if e != nil {
 		return nil, e
@@ -213,8 +221,8 @@ func convertFieldOrMethodRefConstantToObject(class *Class,
 		return nil, fmt.Errorf("Error getting name and type for field: %s", e)
 	}
 	toReturn := FieldOrMethodReference{
-		ClassReference: fieldClass,
-		Field:          parsedNameAndType,
+		C:     fieldClass,
+		Field: parsedNameAndType,
 	}
 	return &toReturn, nil
 }
@@ -329,6 +337,8 @@ func ConvertConstantToObject(class *Class,
 		return &tmp, nil
 	case *class_file.ConstantMethodHandleInfo:
 		return convertMethodHandleInfoToObject(class, v)
+	case *class_file.ConstantFieldInfo:
+		return convertFieldOrMethodRefConstantToObject(class, constant)
 	}
 	return nil, fmt.Errorf("Object conversion for constant %s not implemented",
 		constant)
