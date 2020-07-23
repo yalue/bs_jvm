@@ -182,11 +182,17 @@ type Method struct {
 	Types *class_file.MethodDescriptor
 	// Contains all parsed functions in the method.
 	Instructions []Instruction
+	// The raw binary of the function's code.
+	CodeBytes []byte
+	// This will be true if the "Optimize" pass is done. Must be done before
+	// calling the method.
+	OptimizeDone bool
 }
 
 // Parses the given method from the class file into the structure needed by the
-// JVM for actual execution. Also carries out pre-optimization. Does *not*
-// modify the state of the JVM.
+// JVM for actual execution. Does *not* modify the state of the JVM. The
+// returned Method's Instructions slice will *not* be populated until the
+// Method's Optimize() function is called.
 func (j *JVM) NewMethod(class *Class, index int) (*Method, error) {
 	classFile := class.File
 	if (index < 0) || (index >= len(classFile.Methods)) {
@@ -215,32 +221,52 @@ func (j *JVM) NewMethod(class *Class, index int) (*Method, error) {
 		ContainingClass: class,
 		Types:           method.Descriptor,
 		Instructions:    make([]Instruction, instructionCount),
+		CodeBytes:       codeBytes,
+		OptimizeDone:    false,
 	}
-	address = 0
+	return &toReturn, nil
+}
+
+// This does the "optimization" pass on the method if it hasn't already been
+// done. Returns an error if one occurs. Immediately returns nil if
+// m.OptimizeDone is already true.
+func (m *Method) Optimize() error {
+	if m.OptimizeDone {
+		return nil
+	}
+	address := uint(0)
+	var e error
+	var instruction Instruction
+	codeMemory := MemoryFromSlice(m.CodeBytes)
+	instructionCount := len(m.Instructions)
+
+	// Create the instruction objects, and make a map of instruction offsets ->
+	// indices in the Instructions slice. This map is used in the next pass,
+	// when calling the "optimize" function.
 	offsetMap := make(map[uint]int)
-	// The second pass reads the instructions into the internal array, and
-	// builds a map between instruction offsets -> indices for optimization.
 	for i := 0; i < instructionCount; i++ {
 		instruction, e = GetNextInstruction(codeMemory, address)
 		if e != nil {
-			return nil, fmt.Errorf("Error reading instruction: %s", e)
+			return fmt.Errorf("Error reading instruction: %s", e)
 		}
-		toReturn.Instructions[i] = instruction
+		m.Instructions[i] = instruction
 		offsetMap[address] = i
 		address += instruction.Length()
 	}
-	// The final pass performs the per-instruction optimization.
+
+	// Finally, call the "optimize" function on every instruction.
 	address = 0
-	for i := 0; i < instructionCount; i++ {
-		instruction = toReturn.Instructions[i]
-		e = instruction.Optimize(&toReturn, address, offsetMap)
+	for i := 0; i < len(m.Instructions); i++ {
+		instruction = m.Instructions[i]
+		e = instruction.Optimize(m, address, offsetMap)
 		if e != nil {
-			return nil, fmt.Errorf("Error in optimization pass over %s: %s",
+			return fmt.Errorf("Error in optimization pass over %s: %s",
 				instruction, e)
 		}
 		address += instruction.Length()
 	}
-	return &toReturn, nil
+	m.OptimizeDone = true
+	return nil
 }
 
 // Adds the given class file to the JVM so that its code
@@ -289,6 +315,13 @@ func (j *JVM) StartThread(className, methodName string) error {
 	method, e := j.GetMethod(className, methodName)
 	if e != nil {
 		return e
+	}
+	// We may need to optimize this method in case this is the first time it's
+	// being invoked.
+	e = method.Optimize()
+	if e != nil {
+		return fmt.Errorf("Failed preparing thread's start method for "+
+			"execution: %s", e)
 	}
 	j.lockThreadList()
 	threadIndex := len(j.threads)
