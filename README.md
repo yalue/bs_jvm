@@ -10,7 +10,8 @@ implementation in the Go programming language.
 Usage
 -----
 
-For now, only class file disassembly works. Usage:
+For now, only class file disassembly "works", but it will likely fail for any
+references to classes outside of the one being disassembled. Usage:
 
 ```bash
 cd disassemble/

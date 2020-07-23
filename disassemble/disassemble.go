@@ -28,6 +28,12 @@ func run() int {
 	fmt.Printf("Methods in class %s:\n", className)
 	class := jvm.Classes[className]
 	for name, method := range class.Methods {
+		e = method.Optimize()
+		if e != nil {
+			fmt.Printf("Unable to resolve instructions in method %s: %s\n",
+				name, e)
+			continue
+		}
 		offset = 0
 		fmt.Printf("  Method %s %s(%s):\n", method.Types.ReturnString(), name,
 			method.Types.ArgumentsString())
