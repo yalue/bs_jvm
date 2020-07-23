@@ -41,7 +41,13 @@ type Class struct {
 	// Like StaticFieldTypes, but corresponding to entries in the FieldValues
 	// array in *instances* of this class.
 	FieldTypes []class_file.FieldType
-	File       *class_file.Class
+	// Holds the names of static fields. Indexed the same way as other static
+	// field slices.
+	StaticFieldNames []string
+	// Holds the names of non-static fields. Indexed the same way as FieldTypes
+	FieldNames []string
+	// A reference to the class_file.Class object defining this class.
+	File *class_file.Class
 }
 
 func (c *Class) String() string {
@@ -167,16 +173,21 @@ func (c *Class) getFieldInfo() error {
 			nonStaticCount++
 		}
 	}
-	c.StaticFieldValues = make([]Object, staticCount)
 
-	// Also allocate and populate the lists of field types.
+	// Now that we know the number of fields and static fields, we can allocate
+	// a bunch of slices to hold the additional metadata.
+	c.StaticFieldValues = make([]Object, staticCount)
 	c.StaticFieldTypes = make([]class_file.FieldType, staticCount)
+	c.StaticFieldNames = make([]string, staticCount)
 	c.FieldTypes = make([]class_file.FieldType, nonStaticCount)
+	c.FieldNames = make([]string, nonStaticCount)
 	for _, f := range c.FieldInfo {
 		if f.FileField.Access.IsStatic() {
 			c.StaticFieldTypes[f.Index] = f.FileField.Descriptor
+			c.StaticFieldNames[f.Index] = string(f.FileField.Name)
 		} else {
 			c.FieldTypes[f.Index] = f.FileField.Descriptor
+			c.FieldNames[f.Index] = string(f.FileField.Name)
 		}
 	}
 	return nil
@@ -197,6 +208,8 @@ func NewClass(j *JVM, class *class_file.Class) (*Class, error) {
 		StaticFieldValues: nil,
 		FieldTypes:        nil,
 		StaticFieldTypes:  nil,
+		StaticFieldNames:  nil,
+		FieldNames:        nil,
 		File:              class,
 	}
 	var methodName []byte

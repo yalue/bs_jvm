@@ -18,7 +18,6 @@ type Instruction interface {
 	// instruction's offset (in bytes) into the method code, and a map of
 	// instruction offsets to instruction indices. This must be called during
 	// an optimization pass before execution.
-	// TODO: Make instructionIndices a map[uint]uint instead.
 	Optimize(m *Method, offset uint, instructionIndices map[uint]int) error
 	// Runs the instruction in the given thread
 	Execute(t *Thread) error
@@ -2778,6 +2777,14 @@ type getstaticInstruction struct {
 	index int
 }
 
+func (n *getstaticInstruction) String() string {
+	if n.class == nil {
+		return fmt.Sprintf("getstatic %d", n.value)
+	}
+	fieldName := n.class.StaticFieldNames[n.index]
+	return fmt.Sprintf("getstatic %s.%s", n.class.Name, fieldName)
+}
+
 func parseGetstaticInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
 	toReturn, e := parseTwoByteArgumentInstruction(opcode, name, address, m)
@@ -2802,6 +2809,14 @@ func parsePutstaticInstruction(opcode uint8, name string, address uint,
 		return nil, e
 	}
 	return &putstaticInstruction{*toReturn, nil, 0}, nil
+}
+
+func (n *putstaticInstruction) String() string {
+	if n.class == nil {
+		return fmt.Sprintf("putstatic %d", n.value)
+	}
+	fieldName := n.class.StaticFieldNames[n.index]
+	return fmt.Sprintf("putstatic %s.%s", n.class.Name, fieldName)
 }
 
 type getfieldInstruction struct{ twoByteArgumentInstruction }
