@@ -408,7 +408,7 @@ func (n *returnInstruction) Optimize(m *Method, offset uint,
 // Takes a class and an index into that class' constant pool. The index must
 // specify a field info constant (*class_file.ConstantFieldInfo). Returns the
 // resolved constant.
-func resolveStaticFieldConstant(currentClass *Class, index uint16) (
+func lookupFieldInfoConstant(currentClass *Class, index uint16) (
 	*FieldOrMethodReference, error) {
 	classFile := currentClass.File
 	constant, e := classFile.GetConstant(index)
@@ -440,7 +440,7 @@ func resolveStaticFieldConstant(currentClass *Class, index uint16) (
 // Figures out the class and field to get, and makes sure the field is static.
 func (n *getstaticInstruction) Optimize(m *Method, offset uint,
 	indices map[uint]int) error {
-	fieldInfo, e := resolveStaticFieldConstant(m.ContainingClass, n.value)
+	fieldInfo, e := lookupFieldInfoConstant(m.ContainingClass, n.value)
 	if e != nil {
 		return fmt.Errorf("Failed resolving field for getstatic "+
 			"instruction: %s", e)
@@ -462,7 +462,7 @@ func (n *getstaticInstruction) Optimize(m *Method, offset uint,
 func (n *putstaticInstruction) Optimize(m *Method, offset uint,
 	indices map[uint]int) error {
 	// Basically the same as for getstatic.
-	fieldInfo, e := resolveStaticFieldConstant(m.ContainingClass, n.value)
+	fieldInfo, e := lookupFieldInfoConstant(m.ContainingClass, n.value)
 	if e != nil {
 		return fmt.Errorf("Failed resolving field for putstatic "+
 			"instruction: %s", e)
@@ -476,5 +476,29 @@ func (n *putstaticInstruction) Optimize(m *Method, offset uint,
 	}
 	n.class = targetClass
 	n.index = index
+	return nil
+}
+
+func (n *getfieldInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	// There's potentially a lot more we can do here, but for now we'll just
+	// look up the field's name ahead of time.
+	fieldInfo, e := lookupFieldInfoConstant(m.ContainingClass, n.value)
+	if e != nil {
+		return fmt.Errorf("Failed resolving field for getfield "+
+			"instruction: %s", e)
+	}
+	n.fieldReference = fieldInfo
+	return nil
+}
+
+func (n *putfieldInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	fieldInfo, e := lookupFieldInfoConstant(m.ContainingClass, n.value)
+	if e != nil {
+		return fmt.Errorf("Failed resolving field for putfield "+
+			"instruction: %s", e)
+	}
+	n.fieldReference = fieldInfo
 	return nil
 }

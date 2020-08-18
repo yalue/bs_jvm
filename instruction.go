@@ -2819,7 +2819,14 @@ func (n *putstaticInstruction) String() string {
 	return fmt.Sprintf("putstatic %s.%s", n.class.Name, fieldName)
 }
 
-type getfieldInstruction struct{ twoByteArgumentInstruction }
+type getfieldInstruction struct {
+	twoByteArgumentInstruction
+	// Unlike getstatic, we can't figure out a field's index until runtime,
+	// when we know what object is actually on the stack. (Technically we
+	// *could* try, but doing so would rely on better type checking so it will
+	// be easier this way for now.)
+	fieldReference *FieldOrMethodReference
+}
 
 func parseGetfieldInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2827,10 +2834,20 @@ func parseGetfieldInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &getfieldInstruction{*toReturn}, nil
+	return &getfieldInstruction{*toReturn, nil}, nil
 }
 
-type putfieldInstruction struct{ twoByteArgumentInstruction }
+func (n *getfieldInstruction) String() string {
+	if n.fieldReference != nil {
+		return "getfield " + string(n.fieldReference.Field.Name)
+	}
+	return fmt.Sprintf("getfield %d", n.value)
+}
+
+type putfieldInstruction struct {
+	twoByteArgumentInstruction
+	fieldReference *FieldOrMethodReference
+}
 
 func parsePutfieldInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2838,7 +2855,14 @@ func parsePutfieldInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &putfieldInstruction{*toReturn}, nil
+	return &putfieldInstruction{*toReturn, nil}, nil
+}
+
+func (n *putfieldInstruction) String() string {
+	if n.fieldReference != nil {
+		return "getfield " + string(n.fieldReference.Field.Name)
+	}
+	return fmt.Sprintf("getfield %d", n.value)
 }
 
 type invokevirtualInstruction struct{ twoByteArgumentInstruction }

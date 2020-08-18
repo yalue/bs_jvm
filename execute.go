@@ -1909,14 +1909,95 @@ func (n *putstaticInstruction) Execute(t *Thread) error {
 }
 
 func (n *getfieldInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	v, e := t.Stack.PopRef()
+	if e != nil {
+		return e
+	}
+	instance, ok := v.(*ClassInstance)
+	if !ok {
+		return TypeError(fmt.Sprintf("Didn't get a valid object for getfield."+
+			" Instead got %s", v.String()))
+	}
+	fieldName := string(n.fieldReference.Field.Name)
+	instance, fieldIndex, e := instance.ResolveField(fieldName)
+	if e != nil {
+		return fmt.Errorf("Couldn't resolve field %s in %s: %s", fieldName,
+			instance.String(), e)
+	}
+	return t.Stack.PushUnconditional(instance.FieldValues[fieldIndex])
 }
 
 func (n *putfieldInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	// Unfortunately, unlike with putstatic, we can't just look at the type
+	// that's in the field, because the value to store in the field needs to
+	// be popped of the stack first (and we don't know its size yet). So, we'll
+	// need to actually look at the type of the FieldOrMethodReference to
+	// figure out what to pop.
+	nameAndType := n.fieldReference.Field
+	fieldType, e := class_file.ParseFieldType(nameAndType.Type)
+	if e != nil {
+		return fmt.Errorf("Invalid field type descriptor: %s", e)
+	}
+	var toStore Object
+	primitiveFieldType, isPrimitive :=
+		fieldType.(class_file.PrimitiveFieldType)
+	if !isPrimitive {
+		toStore, e = t.Stack.PopRef()
+	} else {
+		switch primitiveFieldType {
+		case 'B', 'C', 'I', 'S', 'Z':
+			// Bytes, chars, ints, shorts, and bools are all stored as "ints"
+			// on the stack.
+			toStore, e = t.Stack.Pop()
+		case 'F':
+			toStore, e = t.Stack.PopFloat()
+		case 'D':
+			toStore, e = t.Stack.PopDouble()
+		case 'L':
+			toStore, e = t.Stack.PopLong()
+		default:
+			return fmt.Errorf("Unknown primitive field type: %s",
+				primitiveFieldType)
+			// Afterwards, check the error, then check AssignmentOK
+		}
+	}
+	if e != nil {
+		// This may be a stack-empty error; we've already checked for an
+		// invalid primitiveFieldType.
+		return e
+	}
+
+	// Now that we've popped the value to store from the stack, we can get the
+	// object reference and figure out where to store it.
+	tmp, e := t.Stack.PopRef()
+	if e != nil {
+		return e
+	}
+	classInstance, ok := tmp.(*ClassInstance)
+	if !ok {
+		return fmt.Errorf("Expected to pop a class instance from the stack, "+
+			"got %s instead", tmp.String())
+	}
+	classInstance, fieldIndex, e := classInstance.ResolveField(
+		string(nameAndType.Name))
+	if e != nil {
+		return fmt.Errorf("Couldn't resolve field %s.%s: %s",
+			classInstance.TypeName(), nameAndType.Name, e)
+	}
+
+	// Finally! Check that it's okay to assign the value to the one in the
+	// field, and actually update the field.
+	e = AssignmentOK(toStore, classInstance.FieldValues[fieldIndex])
+	if e != nil {
+		return TypeError(fmt.Sprintf("Trying to assign incompatible type to "+
+			"%s.%s: %s", classInstance.TypeName(), nameAndType.Name, e))
+	}
+	classInstance.FieldValues[fieldIndex] = toStore
+	return nil
 }
 
 func (n *invokevirtualInstruction) Execute(t *Thread) error {
+	// TODO (next): invokevirtual??
 	return NotImplementedError
 }
 

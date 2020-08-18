@@ -180,6 +180,10 @@ type Method struct {
 	ContainingClass *Class
 	// The argument and return types of the method.
 	Types *class_file.MethodDescriptor
+	// The number of local variables used by the method, more or less. Note
+	// that doubles and longs will be counted twice here, which will currently
+	// waste a bit of space in our implementation... oh well.
+	MaxLocals int
 	// Contains all parsed functions in the method.
 	Instructions []Instruction
 	// The raw binary of the function's code.
@@ -220,6 +224,7 @@ func (j *JVM) NewMethod(class *Class, index int) (*Method, error) {
 	toReturn := Method{
 		ContainingClass: class,
 		Types:           method.Descriptor,
+		MaxLocals:       int(codeAttribute.MaxLocals),
 		Instructions:    make([]Instruction, instructionCount),
 		CodeBytes:       codeBytes,
 		OptimizeDone:    false,
