@@ -20,12 +20,21 @@ type ClassField struct {
 	Index int
 }
 
+// Converts a class_file's Method representation into the string we use as a
+// key into the bs_jvm.Class.Methods map.
+func GetMethodKey(m *class_file.Method) string {
+	return fmt.Sprintf("%s %s %s(%s)", m.Access, m.Descriptor.ReturnString(),
+		m.Name, m.Descriptor.ArgumentsString())
+}
+
 // Holds a loaded JVM class. Implements the Object interface, too, for
 // references to class definitions.
 type Class struct {
 	ParentJVM *JVM
 	Name      []byte
-	Methods   map[string]*Method
+	// Maps strings representing class_file methods to bs_jvm Method instances.
+	// The keys for this map are obtained using the GetMethodKey function.
+	Methods map[string]*Method
 	// Maps field names to metadata about the field.  For example, this can be
 	// used to look up a field's index in the StaticFields array, by checking
 	// the "Index" member of the FieldInfo struct.
@@ -46,7 +55,8 @@ type Class struct {
 	StaticFieldNames []string
 	// Holds the names of non-static fields. Indexed the same way as FieldTypes
 	FieldNames []string
-	// A reference to the class_file.Class object defining this class.
+	// A reference to the class_file.Class object defining this class. May be
+	// nil for builtin classes.
 	File *class_file.Class
 }
 
@@ -212,16 +222,15 @@ func NewClass(j *JVM, class *class_file.Class) (*Class, error) {
 		FieldNames:        nil,
 		File:              class,
 	}
-	var methodName []byte
+	var key string
 	var method *Method
 	for i := range class.Methods {
-		methodName = class.Methods[i].Name
+		key = GetMethodKey(class.Methods[i])
 		method, e = j.NewMethod(&toReturn, i)
 		if e != nil {
-			return nil, fmt.Errorf("Failed loading method %s: %s", methodName,
-				e)
+			return nil, fmt.Errorf("Failed loading method %s: %w", key, e)
 		}
-		toReturn.Methods[string(methodName)] = method
+		toReturn.Methods[key] = method
 	}
 	e = (&toReturn).getFieldInfo()
 	if e != nil {

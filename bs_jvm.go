@@ -58,7 +58,7 @@ func (t *Thread) Run() error {
 			}
 			t.WasBranch = false
 			n = t.CurrentMethod.Instructions[t.InstructionIndex]
-			fmt.Sprintf("Running instruction: %s\n", n.String())
+			fmt.Printf("Running instruction: %s\n", n.String())
 			e = n.Execute(t)
 			if !t.WasBranch {
 				// Go to the next instruction in the sequence if we didn't
@@ -127,6 +127,11 @@ func (t *Thread) RestoreReturnInfo(r *ReturnInfo) error {
 // error if one occurs. Expects the instruction index to point at the
 // instruction causing the call.
 func (t *Thread) Call(method *Method) error {
+	// First, check for a native implementation; there's no further action if
+	// we're just calling something native.
+	if method.Native != nil {
+		return method.Native(t)
+	}
 	// TODO: Initialize local variables of the called method.
 	if (t.InstructionIndex + 1) >= uint(len(t.CurrentMethod.Instructions)) {
 		return fmt.Errorf("Invalid return address (inst. index %d)",
@@ -174,6 +179,10 @@ func NewJVM() *JVM {
 	}
 }
 
+// This is a function type that is used for method implementations written
+// in Go.
+type NativeImplementation func(t *Thread) error
+
 // Holds a parsed JVM method.
 type Method struct {
 	// The class in which the method was defined.
@@ -191,6 +200,10 @@ type Method struct {
 	// This will be true if the "Optimize" pass is done. Must be done before
 	// calling the method.
 	OptimizeDone bool
+	// This can be used for Go-implemented methods, but otherwise must be nil.
+	// If this is non-nil, most of the other fields of the Method struct may be
+	// nil, so check this first when invoking a method.
+	Native NativeImplementation
 }
 
 // Parses the given method from the class file into the structure needed by the
@@ -296,15 +309,6 @@ func (j *JVM) GetClass(name string) (*Class, error) {
 	return toReturn, nil
 }
 
-// Wraps jvm.GetClass and class.GetMethod into a single function.
-func (j *JVM) GetMethod(className, methodName string) (*Method, error) {
-	class, e := j.GetClass(className)
-	if e != nil {
-		return nil, e
-	}
-	return class.GetMethod(methodName)
-}
-
 // Shorthand for acquiring the lock on the list of active threads.
 func (j *JVM) lockThreadList() {
 	(&(j.threadsLock)).Lock()
@@ -315,9 +319,19 @@ func (j *JVM) unlockThreadList() {
 	(&(j.threadsLock)).Unlock()
 }
 
-// Spawns a new thread in the JVM, with the given method.
-func (j *JVM) StartThread(className, methodName string) error {
-	method, e := j.GetMethod(className, methodName)
+// Shorthand for calling GetMethod on the named class.
+func (j *JVM) GetMethod(className, methodKey string) (*Method, error) {
+	c := j.Classes[className]
+	if c == nil {
+		return nil, ClassNotFoundError(className)
+	}
+	return c.GetMethod(methodKey)
+}
+
+// Spawns a new thread in the JVM, with the given method. The methodKey must
+// follow the format returned by the GetMethodKey function.
+func (j *JVM) StartThread(className, methodKey string) error {
+	method, e := j.GetMethod(className, methodKey)
 	if e != nil {
 		return e
 	}
@@ -397,6 +411,27 @@ func (j *JVM) LoadClassFromFile(classFileName string) (string, error) {
 	return string(className), nil
 }
 
+// Gets the correctly formatted key for looking up the "main" method in our
+// internal Methods map.
+func getMainMethodKey() string {
+	stringArrayType := &class_file.ArrayType{
+		Dimensions:  1,
+		ContentType: class_file.ClassInstanceType("java/lang/String"),
+	}
+	tmp := &class_file.Method{
+		// public static
+		Access: 1 | 8,
+		// main
+		Name: []byte("main"),
+		// void
+		Descriptor: &class_file.MethodDescriptor{
+			ArgumentTypes: []class_file.FieldType{stringArrayType},
+			ReturnType:    class_file.PrimitiveFieldType('V'),
+		},
+	}
+	return GetMethodKey(tmp)
+}
+
 // Takes a path to a class file, parses and loads the class, then looks for the
 // main function in the class and starts executing it.
 func (j *JVM) StartMainClass(classFileName string) error {
@@ -404,6 +439,6 @@ func (j *JVM) StartMainClass(classFileName string) error {
 	if e != nil {
 		return e
 	}
-	e = j.StartThread(className, "main")
+	e = j.StartThread(className, getMainMethodKey())
 	return e
 }

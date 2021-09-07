@@ -6,8 +6,21 @@ import (
 	"flag"
 	"fmt"
 	"github.com/yalue/bs_jvm"
+	"github.com/yalue/bs_jvm/builtin_classes"
 	"os"
 )
+
+func NewJVMWithBuiltins() (*bs_jvm.JVM, error) {
+	j := bs_jvm.NewJVM()
+	builtins, e := builtin_classes.GetBuiltinClasses(j)
+	if e != nil {
+		return nil, fmt.Errorf("Failed getting builtin classes: %w", e)
+	}
+	for _, class := range builtins {
+		j.Classes[string(class.Name)] = class
+	}
+	return j, nil
+}
 
 func run() int {
 	var filename string
@@ -18,7 +31,11 @@ func run() int {
 		fmt.Println("Invalid arguments. Run with -help for more information.")
 		return 1
 	}
-	jvm := bs_jvm.NewJVM()
+	jvm, e := NewJVMWithBuiltins()
+	if e != nil {
+		fmt.Printf("Failed initializing JVM: %s\n", e)
+		return 1
+	}
 	className, e := jvm.LoadClassFromFile(filename)
 	if e != nil {
 		fmt.Printf("Failed loading class: %s\n", e)
@@ -32,7 +49,6 @@ func run() int {
 		if e != nil {
 			fmt.Printf("Unable to resolve instructions in method %s: %s\n",
 				name, e)
-			continue
 		}
 		offset = 0
 		fmt.Printf("  Method %s %s(%s):\n", method.Types.ReturnString(), name,

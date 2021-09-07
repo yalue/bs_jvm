@@ -451,7 +451,7 @@ func (n *getstaticInstruction) Optimize(m *Method, offset uint,
 	// defined in a superclass, for example)
 	targetClass, index, e := fieldInfo.C.ResolveStaticField(fieldName)
 	if e != nil {
-		return fmt.Errorf("Couldn't resolve static field %s in class %s: %s",
+		return fmt.Errorf("Couldn't resolve static field %s in class %s: %w",
 			fieldName, fieldInfo.C.Name, e)
 	}
 	n.class = targetClass
@@ -465,13 +465,13 @@ func (n *putstaticInstruction) Optimize(m *Method, offset uint,
 	fieldInfo, e := lookupFieldInfoConstant(m.ContainingClass, n.value)
 	if e != nil {
 		return fmt.Errorf("Failed resolving field for putstatic "+
-			"instruction: %s", e)
+			"instruction: %w", e)
 	}
 	var index int
 	fieldName := string(fieldInfo.Field.Name)
 	targetClass, index, e := fieldInfo.C.ResolveStaticField(fieldName)
 	if e != nil {
-		return fmt.Errorf("Couldn't resolve static field %s in class %s: %s",
+		return fmt.Errorf("Couldn't resolve static field %s in class %s: %w",
 			fieldName, fieldInfo.C.Name, e)
 	}
 	n.class = targetClass
@@ -486,7 +486,7 @@ func (n *getfieldInstruction) Optimize(m *Method, offset uint,
 	fieldInfo, e := lookupFieldInfoConstant(m.ContainingClass, n.value)
 	if e != nil {
 		return fmt.Errorf("Failed resolving field for getfield "+
-			"instruction: %s", e)
+			"instruction: %w", e)
 	}
 	n.fieldReference = fieldInfo
 	return nil
@@ -497,7 +497,7 @@ func (n *putfieldInstruction) Optimize(m *Method, offset uint,
 	fieldInfo, e := lookupFieldInfoConstant(m.ContainingClass, n.value)
 	if e != nil {
 		return fmt.Errorf("Failed resolving field for putfield "+
-			"instruction: %s", e)
+			"instruction: %w", e)
 	}
 	n.fieldReference = fieldInfo
 	return nil

@@ -10,6 +10,9 @@ type ClassInstance struct {
 	// The non-static fields of this class. Get indices into this using
 	// C.FieldInfo[fieldName].Index.
 	FieldValues []Object
+	// Used by builtin classes to refer to Go information. Otherwise, should be
+	// nil.
+	NativeData interface{}
 	// TODO: Needs to also keep track of superclass fields. Probably need to
 	// add a "superclass" ClassInstance reference.
 }

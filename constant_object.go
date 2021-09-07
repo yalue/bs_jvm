@@ -19,6 +19,10 @@ func (s *StringObject) TypeName() string {
 	return "String"
 }
 
+func (s *StringObject) Value() string {
+	return string(*s)
+}
+
 func (s *StringObject) String() string {
 	return fmt.Sprintf("%q", string(*s))
 }
