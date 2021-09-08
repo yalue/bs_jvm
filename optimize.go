@@ -443,7 +443,7 @@ func (n *getstaticInstruction) Optimize(m *Method, offset uint,
 	fieldInfo, e := lookupFieldInfoConstant(m.ContainingClass, n.value)
 	if e != nil {
 		return fmt.Errorf("Failed resolving field for getstatic "+
-			"instruction: %s", e)
+			"instruction: %w", e)
 	}
 	var index int
 	fieldName := string(fieldInfo.Field.Name)
@@ -500,5 +500,37 @@ func (n *putfieldInstruction) Optimize(m *Method, offset uint,
 			"instruction: %w", e)
 	}
 	n.fieldReference = fieldInfo
+	return nil
+}
+
+// Takes a class and an index into that class' constant pool. The index must
+// specify a class info constant (*class_file.ConstantClassInfo). Returns an
+// instance of the bs_jvm.Class that the constant refers to.
+func lookupClassConstant(currentClass *Class, index uint16) (*Class, error) {
+	classFile := currentClass.File
+	constant, e := classFile.GetConstant(index)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't get class info constant: %w", e)
+	}
+	tmp, e := ConvertConstantToObject(currentClass, constant)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't get class object from constant: %w",
+			e)
+	}
+	toReturn, ok := tmp.(*Class)
+	if !ok {
+		return nil, fmt.Errorf("Expected a class object from constant, got "+
+			"%s instead", tmp)
+	}
+	return toReturn, nil
+}
+
+func (n *newInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	class, e := lookupClassConstant(m.ContainingClass, n.value)
+	if e != nil {
+		return fmt.Errorf("Failed resolving class constant: %w", e)
+	}
+	n.class = class
 	return nil
 }

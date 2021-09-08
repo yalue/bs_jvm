@@ -44,15 +44,14 @@ func run() int {
 	var offset uint
 	fmt.Printf("Methods in class %s:\n", className)
 	class := jvm.Classes[className]
-	for name, method := range class.Methods {
+	for key, method := range class.Methods {
 		e = method.Optimize()
 		if e != nil {
 			fmt.Printf("Unable to resolve instructions in method %s: %s\n",
-				name, e)
+				key, e)
 		}
 		offset = 0
-		fmt.Printf("  Method %s %s(%s):\n", method.Types.ReturnString(), name,
-			method.Types.ArgumentsString())
+		fmt.Printf("  Method %s:\n", key)
 		for _, n := range method.Instructions {
 			fmt.Printf("    0x%08x %s\n", offset, n)
 			offset += n.Length()

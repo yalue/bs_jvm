@@ -1997,7 +1997,6 @@ func (n *putfieldInstruction) Execute(t *Thread) error {
 }
 
 func (n *invokevirtualInstruction) Execute(t *Thread) error {
-	// TODO (next): invokevirtual??
 	return NotImplementedError
 }
 
@@ -2018,7 +2017,11 @@ func (n *invokedynamicInstruction) Execute(t *Thread) error {
 }
 
 func (n *newInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	instance, e := n.class.CreateInstance()
+	if e != nil {
+		return fmt.Errorf("new %s failed: %w", n.class.Name, e)
+	}
+	return t.Stack.PushRef(instance)
 }
 
 func (n *newarrayInstruction) Execute(t *Thread) error {

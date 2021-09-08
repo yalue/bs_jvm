@@ -2955,7 +2955,11 @@ func parseInvokedynamicInstruction(opcode uint8, name string, address uint,
 	return &invokedynamicInstruction{*toReturn}, nil
 }
 
-type newInstruction struct{ twoByteArgumentInstruction }
+type newInstruction struct {
+	twoByteArgumentInstruction
+	// The class to instantiate
+	class *Class
+}
 
 func parseNewInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2963,7 +2967,17 @@ func parseNewInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &newInstruction{*toReturn}, nil
+	return &newInstruction{
+		twoByteArgumentInstruction: *toReturn,
+		class:                      nil,
+	}, nil
+}
+
+func (n *newInstruction) String() string {
+	if n.class == nil {
+		return fmt.Sprintf("new %d", n.value)
+	}
+	return fmt.Sprintf("new %s", n.class.Name)
 }
 
 type newarrayInstruction struct{ singleByteArgumentInstruction }
