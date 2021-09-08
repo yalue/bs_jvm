@@ -69,11 +69,18 @@ func AddMethod(c *bs_jvm.Class, name string,
 	// native implementations.
 	method := &bs_jvm.Method{
 		ContainingClass: c,
+		Name:            name,
 		Types:           descriptor,
 		OptimizeDone:    true,
 		Native:          f,
 	}
 	c.Methods[key] = method
+}
+
+// Adds a constructor method to the class with the given args.
+func AddConstructor(c *bs_jvm.Class, access class_file.MethodAccessFlags,
+	args []class_file.FieldType, f bs_jvm.NativeMethod) {
+	AddMethod(c, "<init>", access, args, class_file.PrimitiveFieldType('V'), f)
 }
 
 // Wraps AddMethod, simplifying usage for a public non-static method with a

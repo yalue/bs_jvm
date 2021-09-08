@@ -21,10 +21,10 @@ type ClassField struct {
 }
 
 // Converts a class_file's Method representation into the string we use as a
-// key into the bs_jvm.Class.Methods map.
+// key into the bs_jvm.Class.Methods map. Doesn't use m.Access.
 func GetMethodKey(m *class_file.Method) string {
-	return fmt.Sprintf("%s %s %s(%s)", m.Access, m.Descriptor.ReturnString(),
-		m.Name, m.Descriptor.ArgumentsString())
+	return fmt.Sprintf("%s %s(%s)", m.Descriptor.ReturnString(), m.Name,
+		m.Descriptor.ArgumentsString())
 }
 
 // Holds a loaded JVM class. Implements the Object interface, too, for
@@ -90,10 +90,10 @@ func (c *Class) ResolveStaticField(name string) (*Class, int, error) {
 
 // Returns the named method from the class. Returns a MethodNotFoundError if
 // the method isn't found.
-func (c *Class) GetMethod(name string) (*Method, error) {
-	toReturn := c.Methods[name]
+func (c *Class) GetMethod(key string) (*Method, error) {
+	toReturn := c.Methods[key]
 	if toReturn == nil {
-		return nil, MethodNotFoundError(name)
+		return nil, MethodNotFoundError(key)
 	}
 	return toReturn, nil
 }

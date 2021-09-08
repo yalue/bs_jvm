@@ -534,3 +534,57 @@ func (n *newInstruction) Optimize(m *Method, offset uint,
 	n.class = class
 	return nil
 }
+
+// Like lookupFieldInfoConstant, but for methods.
+func lookupMethodInfoConstant(c *Class, index uint16) (*FieldOrMethodReference,
+	error) {
+	classFile := c.File
+	constant, e := classFile.GetConstant(index)
+	if e != nil {
+		return nil, fmt.Errorf("Couldn't get method info constant: %w", e)
+	}
+	_, ok := constant.(*class_file.ConstantMethodInfo)
+	if !ok {
+		return nil, fmt.Errorf("Didn't get a method info constant, instead "+
+			"got: %s", constant.String())
+	}
+	tmp, e := ConvertConstantToObject(c, constant)
+	if e != nil {
+		return nil, fmt.Errorf("Error processing method info constant: %w", e)
+	}
+	methodRef, ok := tmp.(*FieldOrMethodReference)
+	if !ok {
+		return nil, fmt.Errorf("Didn't get expected method reference object, "+
+			"instead got: %s", tmp.String())
+	}
+	return methodRef, nil
+}
+
+func (n *invokespecialInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	methodInfo, e := lookupMethodInfoConstant(m.ContainingClass, n.value)
+	if e != nil {
+		return fmt.Errorf("Failed resolving method for invokespecial "+
+			"instruction: %w", e)
+	}
+	// We need the parsed method descriptor to convert into our "key" format
+	// used for looking up the method in the class.
+	methodDescriptor, e := class_file.ParseMethodDescriptor(
+		methodInfo.Field.Type)
+	if e != nil {
+		return fmt.Errorf("Failed parsing method %s descriptor for "+
+			"invokespecial instruction: %w", methodInfo.Field.Name, e)
+	}
+	tmp := &class_file.Method{
+		Name:       methodInfo.Field.Name,
+		Descriptor: methodDescriptor,
+	}
+	key := GetMethodKey(tmp)
+	method, e := methodInfo.C.GetMethod(key)
+	if e != nil {
+		return fmt.Errorf("Failed getting method %s: %w",
+			methodInfo.Field.Name, e)
+	}
+	n.method = method
+	return nil
+}

@@ -187,6 +187,8 @@ type NativeMethod func(t *Thread) error
 type Method struct {
 	// The class in which the method was defined.
 	ContainingClass *Class
+	// The name of the method. Mostly for debugging purposes.
+	Name string
 	// The argument and return types of the method.
 	Types *class_file.MethodDescriptor
 	// The number of local variables used by the method, more or less. Note
@@ -236,6 +238,7 @@ func (j *JVM) NewMethod(class *Class, index int) (*Method, error) {
 	}
 	toReturn := Method{
 		ContainingClass: class,
+		Name:            string(method.Name),
 		Types:           method.Descriptor,
 		MaxLocals:       int(codeAttribute.MaxLocals),
 		Instructions:    make([]Instruction, instructionCount),

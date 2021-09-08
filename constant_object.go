@@ -343,6 +343,8 @@ func ConvertConstantToObject(class *Class,
 		return convertMethodHandleInfoToObject(class, v)
 	case *class_file.ConstantFieldInfo:
 		return convertFieldOrMethodRefConstantToObject(class, constant)
+	case *class_file.ConstantMethodInfo:
+		return convertFieldOrMethodRefConstantToObject(class, constant)
 	}
 	return nil, fmt.Errorf("Object conversion for constant %s not implemented",
 		constant)

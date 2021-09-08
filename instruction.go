@@ -2876,7 +2876,11 @@ func parseInvokevirtualInstruction(opcode uint8, name string, address uint,
 	return &invokevirtualInstruction{*toReturn}, nil
 }
 
-type invokespecialInstruction struct{ twoByteArgumentInstruction }
+type invokespecialInstruction struct {
+	twoByteArgumentInstruction
+	// The method to be invoked.
+	method *Method
+}
 
 func parseInvokespecialInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2884,7 +2888,20 @@ func parseInvokespecialInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &invokespecialInstruction{*toReturn}, nil
+	return &invokespecialInstruction{
+		twoByteArgumentInstruction: *toReturn,
+		method:                     nil,
+	}, nil
+}
+
+func (n *invokespecialInstruction) String() string {
+	if n.method == nil {
+		return fmt.Sprintf("invokespecial %d", n.value)
+	}
+	m := n.method
+	return fmt.Sprintf("invokespecial %s %s.%s(%s)",
+		m.Types.ReturnString(), n.method.ContainingClass.Name, m.Name,
+		m.Types.ArgumentsString())
 }
 
 type invokestaticInstruction struct{ twoByteArgumentInstruction }
