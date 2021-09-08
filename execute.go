@@ -841,18 +841,6 @@ func (n *pop2Instruction) Execute(t *Thread) error {
 	return e
 }
 
-func (n *dupInstruction) Execute(t *Thread) error {
-	o, e := t.Stack.PopUnconditional()
-	if e != nil {
-		return e
-	}
-	e = t.Stack.PushUnconditional(o)
-	if e != nil {
-		return e
-	}
-	return t.Stack.PushUnconditional(o)
-}
-
 // Pushes multiple values onto the stack, returning an error if any one of the
 // pushes returned an error. Values are pushed in the order they are listed, so
 // the first value is pushed first, etc.
@@ -865,6 +853,14 @@ func pushMultiUnconditional(stack ThreadStack, values ...Object) error {
 		}
 	}
 	return nil
+}
+
+func (n *dupInstruction) Execute(t *Thread) error {
+	o, e := t.Stack.PopUnconditional()
+	if e != nil {
+		return e
+	}
+	return pushMultiUnconditional(t.Stack, o, o)
 }
 
 func (n *dup_x1Instruction) Execute(t *Thread) error {

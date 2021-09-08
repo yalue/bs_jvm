@@ -78,51 +78,21 @@ func printlnStringMethod(t *bs_jvm.Thread) error {
 	return nil
 }
 
-// Adds the given function, f, to the class' Methods list. The method must
-// be void, with a single arg with the given type.
-func addSingleArgVoid(c *bs_jvm.Class, name string, arg class_file.FieldType,
-	f bs_jvm.NativeImplementation) {
-	descriptor := &class_file.MethodDescriptor{
-		// void
-		ReturnType:    class_file.PrimitiveFieldType('V'),
-		ArgumentTypes: []class_file.FieldType{arg},
-	}
-	tmp := &class_file.Method{
-		// public
-		Access:     1,
-		Name:       []byte(name),
-		Descriptor: descriptor,
-	}
-	key := bs_jvm.GetMethodKey(tmp)
-
-	// The remaining uninitialized fields in this struct aren't needed for
-	// native implementations.
-	method := &bs_jvm.Method{
-		ContainingClass: printStreamClass,
-		Types:           descriptor,
-		OptimizeDone:    true,
-		Native:          f,
-	}
-	c.Methods[key] = method
-}
-
 // Returns a BS-JVM class implementing java/io/PrintStream. If a class has
 // already been initialized, returns the existing copy.
 func GetPrintStreamClass(jvm *bs_jvm.JVM) (*bs_jvm.Class, error) {
 	if printStreamClass != nil {
 		return printStreamClass, nil
 	}
-	toReturn := GetEmptyClass(jvm, "java/io/PrintStream")
-	// printStreamClass must be set before adding the methods.
-	printStreamClass = toReturn
 
-	// The print method with a single char arg.
-	addSingleArgVoid(toReturn, "print", class_file.PrimitiveFieldType('C'),
-		printCharMethod)
-	// println with a single String arg
-	addSingleArgVoid(toReturn, "println",
+	toReturn := GetEmptyClass(jvm, "java/io/PrintStream")
+	AddSingleArgVoidMethod(toReturn, "print",
+		class_file.PrimitiveFieldType('C'), printCharMethod)
+	AddSingleArgVoidMethod(toReturn, "println",
 		class_file.ClassInstanceType("java/lang/String"), printlnStringMethod)
+
 	// TODO: Continue implementing the PrintStream builtin class
 	//  - checkError, clearError, print, printf, println, etc.
+	printStreamClass = toReturn
 	return toReturn, nil
 }

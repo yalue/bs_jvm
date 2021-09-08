@@ -103,3 +103,11 @@ type FieldError string
 func (e FieldError) Error() string {
 	return fmt.Sprintf("Field error: %s", string(e))
 }
+
+// This type of error is returned when an illegal argument is passed to a
+// method.
+type IllegalArgumentError string
+
+func (e IllegalArgumentError) Error() string {
+	return fmt.Sprintf("Illegal argument: %s", string(e))
+}

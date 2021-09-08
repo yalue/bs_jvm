@@ -181,7 +181,7 @@ func NewJVM() *JVM {
 
 // This is a function type that is used for method implementations written
 // in Go.
-type NativeImplementation func(t *Thread) error
+type NativeMethod func(t *Thread) error
 
 // Holds a parsed JVM method.
 type Method struct {
@@ -203,7 +203,7 @@ type Method struct {
 	// This can be used for Go-implemented methods, but otherwise must be nil.
 	// If this is non-nil, most of the other fields of the Method struct may be
 	// nil, so check this first when invoking a method.
-	Native NativeImplementation
+	Native NativeMethod
 }
 
 // Parses the given method from the class file into the structure needed by the

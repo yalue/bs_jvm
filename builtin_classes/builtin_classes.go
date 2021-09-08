@@ -50,6 +50,40 @@ func AppendStaticField(c *bs_jvm.Class, name string,
 	c.StaticFieldValues = append(c.StaticFieldValues, v)
 }
 
+// Adds a native method to the given class. The args, return type, name, access
+// flags, and implementation must all be specified.
+func AddMethod(c *bs_jvm.Class, name string,
+	access class_file.MethodAccessFlags, args []class_file.FieldType,
+	returns class_file.FieldType, f bs_jvm.NativeMethod) {
+	descriptor := &class_file.MethodDescriptor{
+		ReturnType:    returns,
+		ArgumentTypes: args,
+	}
+	tmp := &class_file.Method{
+		Access:     access,
+		Name:       []byte(name),
+		Descriptor: descriptor,
+	}
+	key := bs_jvm.GetMethodKey(tmp)
+	// The remaining uninitialized fields in this struct aren't needed for
+	// native implementations.
+	method := &bs_jvm.Method{
+		ContainingClass: c,
+		Types:           descriptor,
+		OptimizeDone:    true,
+		Native:          f,
+	}
+	c.Methods[key] = method
+}
+
+// Wraps AddMethod, simplifying usage for a public non-static method with a
+// single arg and returning void.
+func AddSingleArgVoidMethod(c *bs_jvm.Class, name string,
+	arg class_file.FieldType, f bs_jvm.NativeMethod) {
+	AddMethod(c, name, 1, []class_file.FieldType{arg},
+		class_file.PrimitiveFieldType('V'), f)
+}
+
 // Returns a list of builtin Class objects, that may be registered with a given
 // JVM. Each class' Name field will be set to the fully-qualified name of the
 // class that it implements, but class-file-specific information may be unset,
@@ -59,11 +93,16 @@ func AppendStaticField(c *bs_jvm.Class, name string,
 // Requires a reference to the parent JVM, but will not modify its state.
 func GetBuiltinClasses(jvm *bs_jvm.JVM) ([]*bs_jvm.Class, error) {
 	toReturn := make([]*bs_jvm.Class, 0, 10)
+	// Create new builtin classes and add them here as needed.
 	tmp, e := GetSystemClass(jvm)
 	if e != nil {
 		return nil, fmt.Errorf("Failed initializing System class: %w", e)
 	}
 	toReturn = append(toReturn, tmp)
-	// Create new builtin classes and add them here as needed.
+	tmp, e = GetRandomClass(jvm)
+	if e != nil {
+		return nil, fmt.Errorf("Failed initializing Random class: %w", e)
+	}
+	toReturn = append(toReturn, tmp)
 	return toReturn, nil
 }
