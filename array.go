@@ -21,7 +21,7 @@ func (n IntArray) TypeName() string {
 func (n IntArray) String() string {
 	s := "["
 	for i, v := range n {
-		s += string(int32(v))
+		s += strconv.FormatInt(int64(v), 10)
 		if i < (len(n) - 1) {
 			s += ","
 		}
@@ -44,7 +44,7 @@ func (n LongArray) TypeName() string {
 func (n LongArray) String() string {
 	s := "["
 	for i, v := range n {
-		s += string(int64(v))
+		s += strconv.FormatInt(int64(v), 10)
 		if i < (len(n) - 1) {
 			s += ","
 		}
@@ -136,7 +136,7 @@ func (n ByteArray) TypeName() string {
 func (n ByteArray) String() string {
 	s := "["
 	for i, v := range n {
-		s += string(int8(v))
+		s += strconv.Itoa(int(int8(v)))
 		if i < (len(n) - 1) {
 			s += ","
 		}
@@ -178,7 +178,7 @@ func (n ShortArray) TypeName() string {
 func (n ShortArray) String() string {
 	s := "["
 	for i, v := range n {
-		s += string(int16(v))
+		s += strconv.Itoa(int(int16(v)))
 		if i < (len(n) - 1) {
 			s += ","
 		}
