@@ -2001,7 +2001,7 @@ func (n *invokespecialInstruction) Execute(t *Thread) error {
 }
 
 func (n *invokestaticInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Call(n.method)
 }
 
 func (n *invokeinterfaceInstruction) Execute(t *Thread) error {

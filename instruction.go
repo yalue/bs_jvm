@@ -2643,7 +2643,7 @@ func parseLookupswitchInstruction(opcode uint8, name string, address uint,
 	if (address % 4) == 0 {
 		paddingBytes = 0
 	} else {
-		paddingBytes = 4 - int(address % 4)
+		paddingBytes = 4 - int(address%4)
 	}
 	if paddingBytes > 0 {
 		toReturn.skippedBytes = make([]byte, paddingBytes)
@@ -2913,7 +2913,10 @@ func (n *invokespecialInstruction) String() string {
 		m.Types.ArgumentsString())
 }
 
-type invokestaticInstruction struct{ twoByteArgumentInstruction }
+type invokestaticInstruction struct {
+	twoByteArgumentInstruction
+	method *Method
+}
 
 func parseInvokestaticInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2921,7 +2924,20 @@ func parseInvokestaticInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &invokestaticInstruction{*toReturn}, nil
+	return &invokestaticInstruction{
+		twoByteArgumentInstruction: *toReturn,
+		method:                     nil,
+	}, nil
+}
+
+func (n *invokestaticInstruction) String() string {
+	if n.method == nil {
+		return fmt.Sprintf("invokestatic %d", n.value)
+	}
+	m := n.method
+	return fmt.Sprintf("invokespecial %s %s.%s(%s)",
+		m.Types.ReturnString(), n.method.ContainingClass.Name, m.Name,
+		m.Types.ArgumentsString())
 }
 
 type invokeinterfaceInstruction struct {

@@ -151,7 +151,7 @@ func (t *Thread) PopMethodArgs(method *Method, locals []Object) error {
 		}
 		argSize += 1
 	}
-	if argSize < len(locals) {
+	if argSize > len(locals) {
 		return TypeError(fmt.Sprintf("Args for method %s require %d locals, "+
 			"but only %d locals were allocated", method.Name, argSize,
 			len(locals)))
@@ -229,13 +229,17 @@ func (t *Thread) Call(method *Method) error {
 		return fmt.Errorf("Invalid return address (inst. index %d)",
 			t.InstructionIndex)
 	}
+	e := method.Optimize()
+	if e != nil {
+		return e
+	}
 	// TODO: Optimize local variable allocation so we don't have an allocation
 	// per method invocation. IDEA: Each thread maintains a simple "stack" of
 	// local variables, grown if needed. When popping local variables, etc, we
 	// simply set the slice. When calling, we just use the next slice, assuming
 	// it's big enough. Will simply increase capacity when needed.
 	newLocals := make([]Object, method.MaxLocals)
-	e := t.PopMethodArgs(method, newLocals)
+	e = t.PopMethodArgs(method, newLocals)
 	if e != nil {
 		return fmt.Errorf("Error initializing method arguments: %w", e)
 	}
@@ -243,6 +247,7 @@ func (t *Thread) Call(method *Method) error {
 	if e != nil {
 		return e
 	}
+	t.WasBranch = true
 	t.LocalVariables = newLocals
 	t.CurrentMethod = method
 	t.InstructionIndex = 0

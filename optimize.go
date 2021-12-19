@@ -588,3 +588,36 @@ func (n *invokespecialInstruction) Optimize(m *Method, offset uint,
 	n.method = method
 	return nil
 }
+
+func (n *invokestaticInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	// This process is very similar to the one used in invokespecial
+	methodInfo, e := lookupMethodInfoConstant(m.ContainingClass, n.value)
+	if e != nil {
+		return fmt.Errorf("Failed resolving method for invokestatic "+
+			"instruction: %w", e)
+	}
+	methodDescriptor, e := class_file.ParseMethodDescriptor(
+		methodInfo.Field.Type)
+	if e != nil {
+		return fmt.Errorf("Failed parsing %s descriptor for "+
+			"invokestatic instruction: %w", methodInfo.Field.Name, e)
+	}
+	tmp := &class_file.Method{
+		Name:       methodInfo.Field.Name,
+		Descriptor: methodDescriptor,
+	}
+	key := GetMethodKey(tmp)
+	method, e := methodInfo.C.GetMethod(key)
+	if e != nil {
+		return fmt.Errorf("Failed getting method %s: %w",
+			methodInfo.Field.Name, e)
+	}
+	// The spec requires invokestatic to only ever be used with static methods.
+	if (method.AccessFlags & 0x0008) == 0 {
+		return TypeError(fmt.Sprintf("Method %s isn't marked as static",
+			methodInfo.Field.Name))
+	}
+	n.method = method
+	return nil
+}
