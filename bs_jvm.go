@@ -122,6 +122,100 @@ func (t *Thread) RestoreReturnInfo(r *ReturnInfo) error {
 	return nil
 }
 
+// Populates the first local variables with the corresponding number of method
+// arguments, popping the args from the current thread's stack. If the method
+// is non-static, then this will also set locals[0] to the object reference on
+// the stack. Returns an error if one occurs, including if locals isn't big
+// enough to hold all the args.
+func (t *Thread) PopMethodArgs(method *Method, locals []Object) error {
+	isStatic := (method.AccessFlags & 0x0008) != 0
+	var tmp Object
+	var e error
+	// Args are popped in the reverse order, which makes this whole thing an
+	// enormous pain in the neck (at least given my implementation).
+	argSize := 0
+	if !isStatic {
+		argSize += 1
+	}
+	argTypes := method.Types.ArgumentTypes
+	for _, argType := range argTypes {
+		p, isPrimitive := argType.(class_file.PrimitiveFieldType)
+		if !isPrimitive {
+			argSize += 1
+			continue
+		}
+		// Doubles and longs take up two local variable "slots"
+		if (p == 'D') || (p == 'J') {
+			argSize += 2
+			continue
+		}
+		argSize += 1
+	}
+	if argSize < len(locals) {
+		return TypeError(fmt.Sprintf("Args for method %s require %d locals, "+
+			"but only %d locals were allocated", method.Name, argSize,
+			len(locals)))
+	}
+	// Pop the args in reverse order and store them.
+	for i := len(argTypes) - 1; i >= 0; i-- {
+		argType := argTypes[i]
+		p, isPrimitive := argType.(class_file.PrimitiveFieldType)
+		if !isPrimitive {
+			tmp, e = t.Stack.PopRef()
+			if e != nil {
+				return fmt.Errorf("Failed popping reference arg: %w", e)
+			}
+			locals[argSize-1] = tmp
+			argSize -= 1
+			continue
+		}
+		tmp = nil
+		e = nil
+		switch p {
+		case 'B', 'C', 'S', 'Z', 'I':
+			tmp, e = t.Stack.Pop()
+		case 'D':
+			tmp, e = t.Stack.PopDouble()
+		case 'J':
+			tmp, e = t.Stack.PopLong()
+		case 'F':
+			tmp, e = t.Stack.PopFloat()
+		default:
+			return fmt.Errorf("Invalid primitive type for arg: %s", p)
+		}
+		if e != nil {
+			return fmt.Errorf("Failed popping primitive arg: %w", e)
+		}
+		if (p == 'D') || (p == 'J') {
+			locals[argSize-2] = tmp
+			argSize -= 2
+		} else {
+			locals[argSize-1] = tmp
+			argSize -= 1
+		}
+	}
+	// We don't need to pop an object reference if the method is static.
+	if isStatic {
+		if argSize == 0 {
+			return nil
+		}
+		return fmt.Errorf("Internal error popping args for static method %s:"+
+			" argSize still equals %d after popping args", method.Name,
+			argSize)
+	}
+	if argSize != 1 {
+		return fmt.Errorf("Internal error popping args method %s: argSize "+
+			"equals %d after popping args, but before object ref", method.Name,
+			argSize)
+	}
+	tmp, e = t.Stack.PopRef()
+	if e != nil {
+		return fmt.Errorf("Failed popping method's object reference: %w", e)
+	}
+	locals[0] = tmp
+	return nil
+}
+
 // Carries out a method call, including pushing the return location. Returns an
 // error if one occurs. Expects the instruction index to point at the
 // instruction causing the call.
@@ -135,17 +229,21 @@ func (t *Thread) Call(method *Method) error {
 		return fmt.Errorf("Invalid return address (inst. index %d)",
 			t.InstructionIndex)
 	}
-	e := t.Stack.PushFrame(t.GetReturnInfo())
-	if e != nil {
-		return e
-	}
 	// TODO: Optimize local variable allocation so we don't have an allocation
 	// per method invocation. IDEA: Each thread maintains a simple "stack" of
 	// local variables, grown if needed. When popping local variables, etc, we
 	// simply set the slice. When calling, we just use the next slice, assuming
 	// it's big enough. Will simply increase capacity when needed.
-	// TODO: Initialize local variables with argument contents.
-	t.LocalVariables = make([]Object, method.MaxLocals)
+	newLocals := make([]Object, method.MaxLocals)
+	e := t.PopMethodArgs(method, newLocals)
+	if e != nil {
+		return fmt.Errorf("Error initializing method arguments: %w", e)
+	}
+	e = t.Stack.PushFrame(t.GetReturnInfo())
+	if e != nil {
+		return e
+	}
+	t.LocalVariables = newLocals
 	t.CurrentMethod = method
 	t.InstructionIndex = 0
 	return nil
@@ -162,7 +260,6 @@ func (t *Thread) Return() error {
 	if e != nil {
 		return e
 	}
-	// TODO: Write the return value onto the stack?
 	return t.RestoreReturnInfo(&returnInfo)
 }
 
@@ -197,6 +294,8 @@ type Method struct {
 	Name string
 	// The argument and return types of the method.
 	Types *class_file.MethodDescriptor
+	// Determines the method's permissions, whether it's static, etc.
+	AccessFlags class_file.MethodAccessFlags
 	// The number of local variables used by the method, more or less. Note
 	// that doubles and longs will be counted twice here, which will currently
 	// waste a bit of space in our implementation... oh well.
@@ -246,6 +345,7 @@ func (j *JVM) NewMethod(class *Class, index int) (*Method, error) {
 		ContainingClass: class,
 		Name:            string(method.Name),
 		Types:           method.Descriptor,
+		AccessFlags:     method.Access,
 		MaxLocals:       int(codeAttribute.MaxLocals),
 		Instructions:    make([]Instruction, instructionCount),
 		CodeBytes:       codeBytes,
@@ -353,6 +453,7 @@ func (j *JVM) StartThread(className, methodKey string) error {
 	}
 	j.lockThreadList()
 	threadIndex := len(j.threads)
+	// TODO: Provide the string[] args argument in LocalVariables[0]
 	newThread := Thread{
 		CurrentMethod:    method,
 		ParentJVM:        j,
