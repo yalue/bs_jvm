@@ -2543,7 +2543,11 @@ func parseTableswitchInstruction(opcode uint8, name string, address uint,
 	var toReturn tableswitchInstruction
 	currentOffset := address + 1
 	// First, read up to 3 bytes to get to a 4-byte aligned address
-	toReturn.skippedCount = uint8(currentOffset % 4)
+	if (currentOffset % 4) == 0 {
+		toReturn.skippedCount = 0
+	} else {
+		toReturn.skippedCount = uint8(4 - (currentOffset % 4))
+	}
 	currentOffset += uint(toReturn.skippedCount)
 	toReturn.defaultOffset, e = Read32Bits(m, currentOffset)
 	if e != nil {
@@ -2635,7 +2639,12 @@ func parseLookupswitchInstruction(opcode uint8, name string, address uint,
 	var toReturn lookupswitchInstruction
 	currentOffset := address + 1
 	// Skip padding as in tableswitch
-	paddingBytes := address % 4
+	var paddingBytes int
+	if (address % 4) == 0 {
+		paddingBytes = 0
+	} else {
+		paddingBytes = 4 - int(address % 4)
+	}
 	if paddingBytes > 0 {
 		toReturn.skippedBytes = make([]byte, paddingBytes)
 		for i := range toReturn.skippedBytes {

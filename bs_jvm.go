@@ -23,7 +23,6 @@ type Thread struct {
 	// The stack for this thread
 	Stack ThreadStack
 	// The list of local variables, starting with arguments.
-	// TODO: Initialize LocalVariables for a thread.
 	LocalVariables []Object
 	// A channel that will contain the thread exit reason when the thread has
 	// finished.
@@ -132,7 +131,6 @@ func (t *Thread) Call(method *Method) error {
 	if method.Native != nil {
 		return method.Native(t)
 	}
-	// TODO: Initialize local variables of the called method.
 	if (t.InstructionIndex + 1) >= uint(len(t.CurrentMethod.Instructions)) {
 		return fmt.Errorf("Invalid return address (inst. index %d)",
 			t.InstructionIndex)
@@ -141,6 +139,13 @@ func (t *Thread) Call(method *Method) error {
 	if e != nil {
 		return e
 	}
+	// TODO: Optimize local variable allocation so we don't have an allocation
+	// per method invocation. IDEA: Each thread maintains a simple "stack" of
+	// local variables, grown if needed. When popping local variables, etc, we
+	// simply set the slice. When calling, we just use the next slice, assuming
+	// it's big enough. Will simply increase capacity when needed.
+	// TODO: Initialize local variables with argument contents.
+	t.LocalVariables = make([]Object, method.MaxLocals)
 	t.CurrentMethod = method
 	t.InstructionIndex = 0
 	return nil
@@ -157,6 +162,7 @@ func (t *Thread) Return() error {
 	if e != nil {
 		return e
 	}
+	// TODO: Write the return value onto the stack?
 	return t.RestoreReturnInfo(&returnInfo)
 }
 
@@ -351,6 +357,7 @@ func (j *JVM) StartThread(className, methodKey string) error {
 		CurrentMethod:    method,
 		ParentJVM:        j,
 		InstructionIndex: 0,
+		LocalVariables:   make([]Object, method.MaxLocals),
 		Stack:            NewStack(),
 		threadComplete:   make(chan error),
 		threadIndex:      threadIndex,
