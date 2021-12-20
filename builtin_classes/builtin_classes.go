@@ -111,5 +111,10 @@ func GetBuiltinClasses(jvm *bs_jvm.JVM) ([]*bs_jvm.Class, error) {
 		return nil, fmt.Errorf("Failed initializing Random class: %w", e)
 	}
 	toReturn = append(toReturn, tmp)
+	tmp, e = GetPrintStreamClass(jvm)
+	if e != nil {
+		return nil, fmt.Errorf("Failed initializing PrintStream class: %w", e)
+	}
+	toReturn = append(toReturn, tmp)
 	return toReturn, nil
 }

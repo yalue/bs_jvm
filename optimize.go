@@ -585,6 +585,10 @@ func (n *invokespecialInstruction) Optimize(m *Method, offset uint,
 		return fmt.Errorf("Failed getting method %s: %w",
 			methodInfo.Field.Name, e)
 	}
+	if method.IsStatic() {
+		return TypeError(fmt.Sprintf("Can't use static method %s with the "+
+			"invokespecial instruction", methodInfo.Field.Name))
+	}
 	n.method = method
 	return nil
 }
@@ -614,9 +618,42 @@ func (n *invokestaticInstruction) Optimize(m *Method, offset uint,
 			methodInfo.Field.Name, e)
 	}
 	// The spec requires invokestatic to only ever be used with static methods.
-	if (method.AccessFlags & 0x0008) == 0 {
-		return TypeError(fmt.Sprintf("Method %s isn't marked as static",
-			methodInfo.Field.Name))
+	if !method.IsStatic() {
+		return TypeError(fmt.Sprintf("Can't call non-static method %s with "+
+			"the invokestatic instruction", methodInfo.Field.Name))
+	}
+	n.method = method
+	return nil
+}
+
+func (n *invokevirtualInstruction) Optimize(m *Method, offset uint,
+	indices map[uint]int) error {
+	// Similar to other invoke instructions.
+	methodInfo, e := lookupMethodInfoConstant(m.ContainingClass, n.value)
+	if e != nil {
+		return fmt.Errorf("Failed resolving method for invokevirtual "+
+			"instruction: %w", e)
+	}
+	methodDescriptor, e := class_file.ParseMethodDescriptor(
+		methodInfo.Field.Type)
+	if e != nil {
+		return fmt.Errorf("Failed parsing %s descriptor for "+
+			"invokevirtual instruction: %w", methodInfo.Field.Name, e)
+	}
+	tmp := &class_file.Method{
+		Name:       methodInfo.Field.Name,
+		Descriptor: methodDescriptor,
+	}
+	key := GetMethodKey(tmp)
+	method, e := methodInfo.C.GetMethod(key)
+	if e != nil {
+		return fmt.Errorf("Failed getting method %s: %w",
+			methodInfo.Field.Name, e)
+	}
+	// It isn't allowed to use invokevirtual with static methods.
+	if method.IsStatic() {
+		return TypeError(fmt.Sprintf("Can't use static method %s with the "+
+			"invokevirtual instruction", methodInfo.Field.Name))
 	}
 	n.method = method
 	return nil

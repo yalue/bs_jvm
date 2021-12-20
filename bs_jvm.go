@@ -247,6 +247,7 @@ func (t *Thread) Call(method *Method) error {
 	if e != nil {
 		return e
 	}
+	// Don't increment the PC after calling a method.
 	t.WasBranch = true
 	t.LocalVariables = newLocals
 	t.CurrentMethod = method
@@ -265,7 +266,10 @@ func (t *Thread) Return() error {
 	if e != nil {
 		return e
 	}
-	return t.RestoreReturnInfo(&returnInfo)
+	// Don't increment the PC after returning
+	e = t.RestoreReturnInfo(&returnInfo)
+	t.WasBranch = true
+	return e
 }
 
 // Holds state of the entire JVM, including threads, class files, etc.
@@ -399,6 +403,11 @@ func (m *Method) Optimize() error {
 	}
 	m.OptimizeDone = true
 	return nil
+}
+
+// Returns true if this method is static.
+func (m *Method) IsStatic() bool {
+	return (m.AccessFlags & 0x0008) != 0
 }
 
 // Adds the given class file to the JVM so that its code

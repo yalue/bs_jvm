@@ -2450,6 +2450,10 @@ func parseGotoInstruction(opcode uint8, name string, address uint,
 	return &gotoInstruction{*toReturn, 0}, nil
 }
 
+func (n *gotoInstruction) String() string {
+	return fmt.Sprintf("goto %d", int16(n.value))
+}
+
 type jsrInstruction struct {
 	twoByteArgumentInstruction
 	// This is the instruction index of the subroutine start.
@@ -2874,7 +2878,11 @@ func (n *putfieldInstruction) String() string {
 	return fmt.Sprintf("getfield %d", n.value)
 }
 
-type invokevirtualInstruction struct{ twoByteArgumentInstruction }
+type invokevirtualInstruction struct {
+	twoByteArgumentInstruction
+	// The method to be invoked.
+	method *Method
+}
 
 func parseInvokevirtualInstruction(opcode uint8, name string, address uint,
 	m Memory) (Instruction, error) {
@@ -2882,7 +2890,20 @@ func parseInvokevirtualInstruction(opcode uint8, name string, address uint,
 	if e != nil {
 		return nil, e
 	}
-	return &invokevirtualInstruction{*toReturn}, nil
+	return &invokevirtualInstruction{
+		twoByteArgumentInstruction: *toReturn,
+		method:                     nil,
+	}, nil
+}
+
+func (n *invokevirtualInstruction) String() string {
+	if n.method == nil {
+		return fmt.Sprintf("invokevirtual %d", n.value)
+	}
+	m := n.method
+	return fmt.Sprintf("invokevirtual %s %s.%s(%s)",
+		m.Types.ReturnString(), n.method.ContainingClass.Name, m.Name,
+		m.Types.ArgumentsString())
 }
 
 type invokespecialInstruction struct {

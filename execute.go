@@ -1993,7 +1993,7 @@ func (n *putfieldInstruction) Execute(t *Thread) error {
 }
 
 func (n *invokevirtualInstruction) Execute(t *Thread) error {
-	return NotImplementedError
+	return t.Call(n.method)
 }
 
 func (n *invokespecialInstruction) Execute(t *Thread) error {

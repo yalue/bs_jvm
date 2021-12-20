@@ -149,7 +149,7 @@ func (s *basicDataStack) GetSize() int {
 }
 
 func (s *basicDataStack) SetSize(n int) error {
-	if (n <= 0) || (n > len(s.data)) {
+	if (n < 0) || (n > len(s.data)) {
 		return BadStackSizeError(n)
 	}
 	s.data = s.data[0:n]
