@@ -4,6 +4,7 @@
 package bs_jvm
 
 import (
+	"errors"
 	"fmt"
 	"github.com/yalue/bs_jvm/class_file"
 	"os"
@@ -414,10 +415,31 @@ func (m *Method) IsStatic() bool {
 func (j *JVM) LoadClass(class *class_file.Class) error {
 	loadedClass, e := NewClass(j, class)
 	if e != nil {
-		return fmt.Errorf("Error loading class: %s", e)
+		return fmt.Errorf("Error loading class: %w", e)
 	}
 	j.Classes[string(loadedClass.Name)] = loadedClass
-	return nil
+	clinitKey := getClinitMethodKey()
+	_, e = loadedClass.GetMethod(clinitKey)
+	if e != nil {
+		if errors.Is(e, MethodNotFoundError("<clinit>")) {
+			// The class doesn't have a <clinit> method
+			return nil
+		}
+		return fmt.Errorf("Error looking up <clinit> method: %w", e)
+	}
+	clinitThread, e := j.StartThread(string(loadedClass.Name), clinitKey)
+	if e != nil {
+		return fmt.Errorf("Error running <clinit> for %s: %w",
+			loadedClass.Name, e)
+	}
+	e = clinitThread.WaitForCompletion()
+	if e == ThreadExitedError {
+		// The <clinit> method exited normally.
+		return nil
+	}
+	// NOTE: Maybe check if e is nil here? A successful thread exit shouldn't
+	// be nil, I think.
+	return e
 }
 
 // Returns a reference to the named class. Returns a ClassNotFoundError if the
@@ -452,23 +474,26 @@ func (j *JVM) GetMethod(className, methodKey string) (*Method, error) {
 }
 
 // Spawns a new thread in the JVM, with the given method. The methodKey must
-// follow the format returned by the GetMethodKey function.
-func (j *JVM) StartThread(className, methodKey string) error {
+// follow the format returned by the GetMethodKey function. Returns the thread
+// that was created. However, this thread handle may be ignored, as the thread
+// is still internally tracked and we can wait for its completion using
+// WaitForAllThreads. The Thread return value is so that we can wait for
+// one-off threads independently when needed.
+func (j *JVM) StartThread(className, methodKey string) (*Thread, error) {
 	method, e := j.GetMethod(className, methodKey)
 	if e != nil {
-		return e
+		return nil, e
 	}
 	// We may need to optimize this method in case this is the first time it's
 	// being invoked.
 	e = method.Optimize()
 	if e != nil {
-		return fmt.Errorf("Failed preparing thread's start method for "+
+		return nil, fmt.Errorf("Failed preparing thread's start method for "+
 			"execution: %s", e)
 	}
 	j.lockThreadList()
 	threadIndex := len(j.threads)
-	// TODO: Provide the string[] args argument in LocalVariables[0]
-	newThread := Thread{
+	newThread := &Thread{
 		CurrentMethod:    method,
 		ParentJVM:        j,
 		InstructionIndex: 0,
@@ -477,13 +502,15 @@ func (j *JVM) StartThread(className, methodKey string) error {
 		threadComplete:   make(chan error),
 		threadIndex:      threadIndex,
 	}
-	j.threads = append(j.threads, &newThread)
-	j.unlockThreadList()
-	e = (&newThread).Run()
+	e = newThread.Run()
 	if e != nil {
-		return e
+		// Don't append the new thread if it failed to start.
+		j.unlockThreadList()
+		return nil, e
 	}
-	return nil
+	j.threads = append(j.threads, newThread)
+	j.unlockThreadList()
+	return newThread, nil
 }
 
 // Waits for all threads. May return any error from any thread if the thread
@@ -557,6 +584,23 @@ func getMainMethodKey() string {
 	return GetMethodKey(tmp)
 }
 
+// Gets the correctly formatted key for looking up the "<clinit>" method in our
+// internal Methods map.
+func getClinitMethodKey() string {
+	tmp := &class_file.Method{
+		// TODO: This may not be public for classes with non-public
+		// constructors? See the spec. Ignoring for now.
+		// public static
+		Access: 1 | 8,
+		Name:   []byte("<clinit>"),
+		Descriptor: &class_file.MethodDescriptor{
+			ArgumentTypes: []class_file.FieldType{},
+			ReturnType:    class_file.PrimitiveFieldType('V'),
+		},
+	}
+	return GetMethodKey(tmp)
+}
+
 // Takes a path to a class file, parses and loads the class, then looks for the
 // main function in the class and starts executing it.
 func (j *JVM) StartMainClass(classFileName string) error {
@@ -564,6 +608,7 @@ func (j *JVM) StartMainClass(classFileName string) error {
 	if e != nil {
 		return e
 	}
-	e = j.StartThread(className, getMainMethodKey())
+	// TODO: Provide the string[] args argument somehow.
+	_, e = j.StartThread(className, getMainMethodKey())
 	return e
 }
