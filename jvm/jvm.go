@@ -24,9 +24,20 @@ func NewJVMWithBuiltins() (*bs_jvm.JVM, error) {
 }
 
 func run() int {
+	showTrace := false
+	flag.CommandLine.SetOutput(os.Stdout)
+	flag.Usage = func() {
+		fmt.Printf("Usage of %s:\n", os.Args[0])
+		fmt.Printf("   %s [OPTIONS] <file to run>\n", os.Args[0])
+		fmt.Printf("[OPTIONS] are one or more of:\n")
+		flag.PrintDefaults()
+	}
+	flag.BoolVar(&showTrace, "show_trace", false, "If true, prints a trace "+
+		"of all executed instructions to stdout.")
 	flag.Parse()
 	if len(flag.Args()) != 1 {
 		log.Printf("Usage: ./jvm [OPTIONS] <file to run>\n")
+		log.Printf("Run with \"--help\" for more information.\n")
 		return 1
 	}
 	filename := flag.Arg(0)
@@ -34,6 +45,9 @@ func run() int {
 	if e != nil {
 		log.Printf("Failed initializing JVM: %s\n")
 		return 1
+	}
+	if showTrace {
+		j.TraceSink = os.Stdout
 	}
 
 	// Now actually run the loaded class.

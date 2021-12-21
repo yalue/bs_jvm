@@ -4,9 +4,9 @@
 package bs_jvm
 
 import (
-	"errors"
 	"fmt"
 	"github.com/yalue/bs_jvm/class_file"
+	"io"
 	"os"
 	"sync"
 )
@@ -43,6 +43,7 @@ type Thread struct {
 // to start.
 func (t *Thread) Run() error {
 	go func() {
+		traceSink := t.ParentJVM.TraceSink
 		var e error
 		var n Instruction
 		for e == nil {
@@ -58,7 +59,9 @@ func (t *Thread) Run() error {
 			}
 			t.WasBranch = false
 			n = t.CurrentMethod.Instructions[t.InstructionIndex]
-			fmt.Printf("Running instruction: %s\n", n.String())
+			if traceSink != nil {
+				fmt.Fprintf(traceSink, "Running instruction: %s\n", n.String())
+			}
 			e = n.Execute(t)
 			if !t.WasBranch {
 				// Go to the next instruction in the sequence if we didn't
@@ -280,6 +283,10 @@ type JVM struct {
 	// This lock is acquired whenever the list of active threads must be
 	// modified.
 	threadsLock sync.Mutex
+	// If non-nil, a text trace of execution will be written to this. Changes
+	// to this only apply to newly created threads, so set this before running
+	// anything.
+	TraceSink io.Writer
 	// Maps class names to all loaded classes.
 	Classes map[string]*Class
 }
@@ -421,7 +428,8 @@ func (j *JVM) LoadClass(class *class_file.Class) error {
 	clinitKey := getClinitMethodKey()
 	_, e = loadedClass.GetMethod(clinitKey)
 	if e != nil {
-		if errors.Is(e, MethodNotFoundError("<clinit>")) {
+		_, clinitNotFound := e.(MethodNotFoundError)
+		if clinitNotFound {
 			// The class doesn't have a <clinit> method
 			return nil
 		}
